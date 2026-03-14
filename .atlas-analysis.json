@@ -1,0 +1,96 @@
+{
+  "projectType": "saas",
+  "projectName": "Duix Avatar",
+  "projectDescription": "Open-source AI avatar toolkit for offline video generation and digital human cloning",
+  "theme": "palm",
+  "primaryColor": "#17447c",
+  "lightColor": "#616c77",
+  "darkColor": "#dbe4e8",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "features",
+              "use-cases"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/system-requirements",
+              "getting-started/windows-installation",
+              "getting-started/ubuntu-installation",
+              "getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/creating-avatar",
+              "guides/voice-cloning",
+              "guides/video-synthesis",
+              "guides/managing-models",
+              "guides/exporting-videos"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker-setup",
+              "deployment/nvidia-gpu-setup",
+              "deployment/configuration",
+              "deployment/troubleshooting"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "support/faq",
+              "support/common-issues",
+              "support/contact"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/introduction",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/model-training",
+              "api/audio-synthesis",
+              "api/video-synthesis"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Precise appearance and voice cloning using advanced AI algorithms",
+    "Text and voice-driven virtual avatars with natural lip-syncing",
+    "Fully offline operation with no internet required for privacy protection",
+    "Multi-language support (English, Japanese, Korean, Chinese, French, German, Arabic, Spanish)",
+    "Docker-based deployment with GPU acceleration",
+    "Open APIs for model training, audio synthesis, and video generation"
+  ],
+  "publicApiSurface": [
+    "POST /v1/preprocess - Model training and voice preprocessing",
+    "POST /v1/invoke - Audio synthesis from text using cloned voice",
+    "POST /easy/submit - Video synthesis with audio and avatar",
+    "GET /easy/query - Query video synthesis progress and status"
+  ]
+}
