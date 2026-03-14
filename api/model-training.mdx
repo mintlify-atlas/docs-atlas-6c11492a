@@ -1,0 +1,209 @@
+---
+title: 'Model Training API'
+description: 'Preprocess and train voice models from reference audio files'
+---
+
+## Endpoint
+
+```
+POST http://127.0.0.1:18180/v1/preprocess_and_tran
+```
+
+Preprocesses a reference audio file and trains a voice model for speech synthesis. This is the first step in creating a custom voice for your avatar.
+
+## Request Parameters
+
+<ParamField path="reference_audio" type="string" required>
+  Relative path to the reference audio file from the TTS service root directory.
+  
+  **Format**: Path relative to `duix_avatar_data/voice/data/`
+  
+  **Example**: `origin_audio/sample.wav`
+</ParamField>
+
+<ParamField path="lang" type="string" required>
+  Language code for the audio content.
+  
+  **Supported values:**
+  - `zh` - Chinese
+  - `en` - English (if supported by your TTS engine)
+  
+  **Default**: `zh`
+</ParamField>
+
+<ParamField path="format" type="string" required>
+  Audio file format/extension.
+  
+  **Common values**: `wav`, `mp3`, `m4a`, `flac`
+  
+  **Recommended**: `wav` for best quality
+</ParamField>
+
+## Response Format
+
+The API returns a JSON object with the processed audio information:
+
+<ResponseField name="code" type="number" required>
+  Response status code.
+  
+  **Values:**
+  - `0` - Success
+  - Other values indicate errors
+</ResponseField>
+
+<ResponseField name="asr_format_audio_url" type="string">
+  Path to the processed audio file optimized for ASR (Automatic Speech Recognition).
+  
+  This file is used as the `reference_audio` parameter in audio synthesis requests.
+  
+  **Format**: Relative path from TTS root (e.g., `asr_format_audio/20240314123456789.wav`)
+</ResponseField>
+
+<ResponseField name="reference_audio_text" type="string">
+  Transcribed text from the reference audio.
+  
+  This text represents what was spoken in the reference audio and is used to guide voice cloning.
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://127.0.0.1:18180/v1/preprocess_and_tran \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reference_audio": "origin_audio/my_voice.wav",
+    "lang": "zh",
+    "format": "wav"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('http://127.0.0.1:18180/v1/preprocess_and_tran', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    reference_audio: 'origin_audio/my_voice.wav',
+    lang: 'zh',
+    format: 'wav'
+  })
+});
+
+const result = await response.json();
+console.log(result);
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'http://127.0.0.1:18180/v1/preprocess_and_tran',
+    json={
+        'reference_audio': 'origin_audio/my_voice.wav',
+        'lang': 'zh',
+        'format': 'wav'
+    }
+)
+
+result = response.json()
+print(result)
+```
+</CodeGroup>
+
+## Example Response
+
+```json Success Response
+{
+  "code": 0,
+  "asr_format_audio_url": "asr_format_audio/20240314123456789.wav",
+  "reference_audio_text": "欢迎使用数字人系统，这是一段参考音频"
+}
+```
+
+```json Error Response
+{
+  "code": 1,
+  "message": "Audio file not found or invalid format"
+}
+```
+
+## Implementation Details
+
+The model training process (from `voice.js:17-31`):
+
+```javascript
+export async function train(path, lang = 'zh') {
+  const res = await preprocessAndTran({
+    format: path.split('.').pop(),
+    reference_audio: path,
+    lang
+  })
+  
+  if (res.code !== 0) {
+    return false
+  } else {
+    const { asr_format_audio_url, reference_audio_text } = res
+    // Store in database for later use
+    return insert({ 
+      origin_audio_path: path, 
+      lang, 
+      asr_format_audio_url, 
+      reference_audio_text 
+    })
+  }
+}
+```
+
+## File Location
+
+Reference audio files should be placed in:
+
+- **Windows**: `D:\duix_avatar_data\voice\data\origin_audio\`
+- **macOS/Linux**: `~/duix_avatar_data/voice/data/origin_audio/`
+
+The processed files are stored in the same base directory under `asr_format_audio/`.
+
+## Best Practices
+
+<Tip>
+**Audio Quality Tips:**
+- Use WAV format at 16kHz or higher sample rate
+- Ensure audio is 10-30 seconds long
+- Use clear speech without background noise
+- Avoid music or multiple speakers
+</Tip>
+
+<Warning>
+**Path Format:**
+Always use forward slashes (`/`) in paths, even on Windows. The application automatically converts backslashes.
+</Warning>
+
+## Error Handling
+
+Common error scenarios:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| File not found | Invalid `reference_audio` path | Verify file exists in `origin_audio/` directory |
+| Invalid format | Unsupported audio format | Use WAV, MP3, or other common formats |
+| Processing failed | Corrupted audio file | Try re-encoding the audio file |
+| Language error | Unsupported language code | Use `zh` or other supported language codes |
+
+## Next Steps
+
+After training a model:
+
+1. Save the `asr_format_audio_url` and `reference_audio_text` values
+2. Use these values in the [Audio Synthesis API](/api/audio-synthesis) to generate speech
+3. The generated audio can then be used in the [Video Synthesis API](/api/video-synthesis)
+
+<CardGroup cols={2}>
+  <Card title="Audio Synthesis" icon="microphone" href="/api/audio-synthesis">
+    Generate speech using your trained model
+  </Card>
+  <Card title="Video Synthesis" icon="video" href="/api/video-synthesis">
+    Create videos with synthesized audio
+  </Card>
+</CardGroup>

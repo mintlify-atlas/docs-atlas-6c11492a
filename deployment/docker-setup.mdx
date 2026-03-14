@@ -1,0 +1,541 @@
+---
+title: 'Docker Setup'
+description: 'Install and configure Docker services for Duix Avatar'
+---
+
+## Overview
+
+Duix Avatar uses Docker Compose to deploy three core services for AI avatar generation:
+
+- **duix-avatar-tts** - Text-to-Speech service (Fish Speech)
+- **duix-avatar-asr** - Automatic Speech Recognition service (FunASR)
+- **duix-avatar-gen-video** - Video generation service
+
+All services require NVIDIA GPU support and run in isolated Docker containers.
+
+## Prerequisites
+
+### System Requirements
+
+<Tabs>
+  <Tab title="Windows">
+    - Windows 10 19042.1526 or higher
+    - WSL 2 installed and updated
+    - Docker Desktop for Windows
+  </Tab>
+  <Tab title="Linux">
+    - Ubuntu 22.04 (recommended) or compatible distribution
+    - Docker Engine and Docker Compose
+    - NVIDIA Container Toolkit
+  </Tab>
+</Tabs>
+
+### Hardware Requirements
+
+- **CPU**: 13th Gen Intel Core i5-13400F or equivalent
+- **Memory**: 32GB RAM (required)
+- **GPU**: NVIDIA RTX 4070 or better
+- **Storage**: 
+  - Windows: D: drive with 30GB+ free space, C: drive with 100GB+ free space
+  - Linux: 100GB+ free space
+
+## Installing Docker
+
+### Windows Installation
+
+1. Check if WSL is installed:
+
+```bash
+wsl --list --verbose
+```
+
+2. Update WSL to the latest version:
+
+```bash
+wsl --update
+```
+
+3. Download and install [Docker Desktop for Windows](https://www.docker.com/)
+
+4. Launch Docker Desktop and accept the agreement
+
+5. Skip the login step (optional)
+
+6. Verify Docker is running by checking the Docker Desktop dashboard
+
+### Linux Installation
+
+1. Check if Docker is already installed:
+
+```bash
+docker --version
+```
+
+2. Install Docker if not present:
+
+```bash
+sudo apt update
+sudo apt install docker.io
+sudo apt install docker-compose
+```
+
+3. Verify the installation:
+
+```bash
+docker --version
+docker-compose --version
+```
+
+## Docker Compose Configurations
+
+Duix Avatar provides multiple Docker Compose files for different deployment scenarios:
+
+<CardGroup cols={2}>
+  <Card title="Standard" icon="server">
+    `docker-compose.yml` - Full deployment with all three services (Windows)
+  </Card>
+  <Card title="Linux" icon="linux">
+    `docker-compose-linux.yml` - Full deployment for Ubuntu/Linux systems
+  </Card>
+  <Card title="Lite" icon="feather">
+    `docker-compose-lite.yml` - Video generation only, no TTS/ASR
+  </Card>
+  <Card title="RTX 5090" icon="microchip">
+    `docker-compose-5090.yml` - Optimized for NVIDIA 50 series GPUs
+  </Card>
+</CardGroup>
+
+## Service Architecture
+
+### Full Stack (Standard/Linux)
+
+<CodeGroup>
+
+```yaml docker-compose.yml (Windows)
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    container_name: duix-avatar-tts
+    restart: always
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video,display
+    ports:
+      - '18180:8080'
+    volumes:
+      - d:/duix_avatar_data/voice/data:/code/data
+    command: /bin/bash -c "/opt/conda/envs/python310/bin/python3 tools/api_server.py --listen 0.0.0.0:8080"
+    networks:
+      - ai_network
+
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    container_name: duix-avatar-asr
+    restart: always
+    runtime: nvidia
+    privileged: true
+    working_dir: /workspace/FunASR/runtime
+    ports:
+      - '10095:10095'
+    command: sh /run.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - ai_network
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    container_name: duix-avatar-gen-video
+    restart: always
+    runtime: nvidia
+    privileged: true
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: '8g'
+    ports:
+      - '8383:8383'
+    command: python /code/app_local.py
+    networks:
+      - ai_network
+```
+
+```yaml docker-compose-linux.yml
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    container_name: duix-avatar-tts
+    restart: always
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video,display
+    ports:
+      - '18180:8080'
+    volumes:
+      - ~/duix_avatar_data/voice/data:/code/data
+    command: /bin/bash -c "/opt/conda/envs/python310/bin/python3 tools/api_server.py --listen 0.0.0.0:8080"
+    networks:
+      - ai_network
+
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    container_name: duix-avatar-asr
+    restart: always
+    runtime: nvidia
+    privileged: true
+    working_dir: /workspace/FunASR/runtime
+    ports:
+      - '10095:10095'
+    command: sh /run.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - ai_network
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    container_name: duix-avatar-gen-video
+    restart: always
+    runtime: nvidia
+    privileged: true
+    volumes:
+      - ~/duix_avatar_data/face2face:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: '8g'
+    ports:
+      - '8383:8383'
+    command: python /code/app_local.py
+    networks:
+      - ai_network
+```
+
+```yaml docker-compose-lite.yml
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    container_name: duix-avatar-gen-video
+    restart: always
+    runtime: nvidia
+    privileged: true
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: '8g'
+    ports:
+      - '8383:8383'
+    command: python /code/app_local.py
+    networks:
+      - ai_network
+```
+
+```yaml docker-compose-5090.yml
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-5090
+    container_name: duix-avatar-tts
+    restart: always
+    runtime: nvidia
+    working_dir: /code
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video,display
+    ports:
+      - '18180:8080'
+    volumes:
+      - d:/duix_avatar_data/voice/data:/code/data
+    command: /bin/bash -c "python tools/api_server.py --listen 0.0.0.0:8080"
+    networks:
+      - ai_network
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar-5090
+    container_name: duix-avatar-gen-video
+    restart: always
+    runtime: nvidia
+    privileged: true
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: '8g'
+    ports:
+      - '8383:8383'
+    command: python /code/app_local.py
+    networks:
+      - ai_network
+```
+
+</CodeGroup>
+
+## Service Details
+
+### TTS Service (duix-avatar-tts)
+
+**Purpose**: Converts text to speech using Fish Speech engine
+
+- **Image**: `guiji2025/fish-speech-ziming` (standard) or `guiji2025/fish-speech-5090` (RTX 50 series)
+- **Port**: `18180:8080`
+- **Volume Mount**: Voice data directory
+  - Windows: `d:/duix_avatar_data/voice/data:/code/data`
+  - Linux: `~/duix_avatar_data/voice/data:/code/data`
+- **GPU**: Uses GPU 0 (`NVIDIA_VISIBLE_DEVICES=0`)
+- **API Endpoint**: `http://127.0.0.1:18180/v1/invoke`
+
+### ASR Service (duix-avatar-asr)
+
+**Purpose**: Automatic speech recognition for audio transcription
+
+- **Image**: `guiji2025/fun-asr`
+- **Port**: `10095:10095`
+- **GPU**: Uses all available GPUs
+- **Privileged Mode**: Required for hardware access
+- **Working Directory**: `/workspace/FunASR/runtime`
+
+<Note>
+The ASR service is not included in the lite and 5090 configurations.
+</Note>
+
+### Video Generation Service (duix-avatar-gen-video)
+
+**Purpose**: Generates lip-synced avatar videos
+
+- **Image**: `guiji2025/duix.avatar` (standard) or `guiji2025/duix.avatar-5090` (RTX 50 series)
+- **Port**: `8383:8383`
+- **Volume Mount**: Video and model data
+  - Windows: `d:/duix_avatar_data/face2face:/code/data`
+  - Linux: `~/duix_avatar_data/face2face:/code/data`
+- **Shared Memory**: 8GB (`shm_size: '8g'`)
+- **Memory Management**: `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512`
+- **API Endpoints**:
+  - Submit: `http://127.0.0.1:8383/easy/submit`
+  - Query: `http://127.0.0.1:8383/easy/query`
+
+## Deployment Steps
+
+### 1. Pull Docker Images
+
+<CodeGroup>
+
+```bash Standard (All Services)
+docker pull guiji2025/fun-asr
+docker pull guiji2025/fish-speech-ziming
+docker pull guiji2025/duix.avatar
+```
+
+```bash RTX 5090 Optimized
+docker pull guiji2025/fish-speech-5090
+docker pull guiji2025/duix.avatar-5090
+```
+
+```bash Lite (Video Only)
+docker pull guiji2025/duix.avatar
+```
+
+</CodeGroup>
+
+### 2. Navigate to Deploy Directory
+
+```bash
+cd /path/to/Duix.Avatar/deploy
+```
+
+### 3. Start Services
+
+Choose the appropriate command based on your deployment mode:
+
+<CodeGroup>
+
+```bash Windows (Standard)
+docker-compose up -d
+```
+
+```bash Linux
+docker-compose -f docker-compose-linux.yml up -d
+```
+
+```bash Lite Mode
+docker-compose -f docker-compose-lite.yml up -d
+```
+
+```bash RTX 5090
+docker-compose -f docker-compose-5090.yml up -d
+```
+
+</CodeGroup>
+
+<Info>
+Initial download will take approximately 30 minutes and consume around 70GB of bandwidth. Use a stable WiFi connection.
+</Info>
+
+### 4. Verify Services
+
+Check that services are running:
+
+```bash
+docker ps
+```
+
+Expected output (standard deployment):
+
+```
+CONTAINER ID   IMAGE                              COMMAND                  STATUS
+xxxxxxxx       guiji2025/duix.avatar              "python /code/app_lo…"   Up
+xxxxxxxx       guiji2025/fish-speech-ziming       "/bin/bash -c '/opt/…"   Up
+xxxxxxxx       guiji2025/fun-asr                  "sh /run.sh"             Up
+```
+
+For lite mode, you should see only `duix-avatar-gen-video`.
+
+## Port Mappings
+
+| Service | Internal Port | External Port | Purpose |
+|---------|--------------|---------------|----------|
+| TTS | 8080 | 18180 | Text-to-speech API |
+| ASR | 10095 | 10095 | Speech recognition API |
+| Video Gen | 8383 | 8383 | Video synthesis API |
+
+## Volume Mounts and Data Directories
+
+### Windows Directory Structure
+
+```
+D:/
+└── duix_avatar_data/
+    ├── voice/
+    │   └── data/          # TTS training data and audio files
+    └── face2face/         # Video generation models and data
+```
+
+### Linux Directory Structure
+
+```
+~/
+└── duix_avatar_data/
+    ├── voice/
+    │   └── data/          # TTS training data and audio files
+    └── face2face/         # Video generation models and data
+```
+
+<Warning>
+Ensure the data directories exist and have proper permissions before starting Docker services.
+</Warning>
+
+## Managing Services
+
+### Stop Services
+
+```bash
+docker-compose down
+```
+
+### Restart Services
+
+```bash
+docker-compose restart
+```
+
+### Update Services
+
+To update to the latest version:
+
+```bash
+cd deploy
+docker-compose pull
+docker-compose up -d
+```
+
+### View Service Logs
+
+<CodeGroup>
+
+```bash All Services
+docker-compose logs -f
+```
+
+```bash Specific Service
+docker logs duix-avatar-tts -f
+docker logs duix-avatar-asr -f
+docker logs duix-avatar-gen-video -f
+```
+
+</CodeGroup>
+
+## Network Configuration
+
+All services communicate through the `ai_network` bridge network:
+
+```yaml
+networks:
+  ai_network:
+    driver: bridge
+```
+
+This allows services to communicate with each other using container names as hostnames.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="NVIDIA GPU Setup" icon="microchip" href="/deployment/nvidia-gpu-setup">
+    Configure NVIDIA drivers and Container Toolkit
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/deployment/configuration">
+    Customize environment variables and settings
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/deployment/troubleshooting">
+    Resolve common deployment issues
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/introduction">
+    Learn how to use the service APIs
+  </Card>
+</CardGroup>

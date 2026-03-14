@@ -1,0 +1,340 @@
+---
+title: 'Audio Synthesis API'
+description: 'Generate speech audio from text using trained voice models'
+---
+
+## Endpoint
+
+```
+POST http://127.0.0.1:18180/v1/invoke
+```
+
+Synthesizes speech audio from text using a trained voice model. This endpoint generates natural-sounding speech that matches the reference voice characteristics.
+
+## Request Parameters
+
+### Required Parameters
+
+<ParamField path="speaker" type="string" required>
+  Unique identifier for this synthesis request.
+  
+  **Format**: UUID or any unique string
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  The text content to be synthesized into speech.
+  
+  **Supports**: Chinese and other languages based on model training
+  
+  **Example**: `"欢迎使用数字人系统"`
+</ParamField>
+
+<ParamField path="reference_audio" type="string" required>
+  Path to the processed reference audio file from model training.
+  
+  This is the `asr_format_audio_url` returned by the model training API.
+  
+  **Example**: `"asr_format_audio/20240314123456789.wav"`
+</ParamField>
+
+<ParamField path="reference_text" type="string" required>
+  Transcribed text from the reference audio.
+  
+  This is the `reference_audio_text` returned by the model training API.
+  
+  **Example**: `"欢迎使用数字人系统，这是一段参考音频"`
+</ParamField>
+
+<ParamField path="format" type="string" required>
+  Output audio format.
+  
+  **Supported values**: `wav`, `mp3`
+  
+  **Default**: `wav`
+</ParamField>
+
+### Optional Parameters
+
+<ParamField path="topP" type="number" default="0.7">
+  Top-p sampling parameter for controlling randomness.
+  
+  **Range**: 0.0 - 1.0
+  
+  **Lower values**: More deterministic output
+  
+  **Higher values**: More diverse output
+</ParamField>
+
+<ParamField path="temperature" type="number" default="0.7">
+  Temperature parameter for controlling randomness.
+  
+  **Range**: 0.0 - 2.0
+  
+  **Lower values**: More consistent output
+  
+  **Higher values**: More creative output
+</ParamField>
+
+<ParamField path="max_new_tokens" type="number" default="1024">
+  Maximum number of tokens to generate.
+  
+  **Range**: 1 - 2048
+  
+  **Higher values**: Allow longer audio generation
+</ParamField>
+
+<ParamField path="chunk_length" type="number" default="100">
+  Length of text chunks for processing.
+  
+  **Range**: 50 - 200
+  
+  **Affects**: Processing speed and memory usage
+</ParamField>
+
+<ParamField path="repetition_penalty" type="number" default="1.2">
+  Penalty for repeating tokens.
+  
+  **Range**: 1.0 - 2.0
+  
+  **Higher values**: Reduce repetitive speech patterns
+</ParamField>
+
+<ParamField path="need_asr" type="boolean" default="false">
+  Whether to perform ASR on the output.
+  
+  **Values**: `true`, `false`
+</ParamField>
+
+<ParamField path="streaming" type="boolean" default="false">
+  Enable streaming output.
+  
+  **Values**: `true`, `false`
+  
+  **Note**: Currently not used in the application
+</ParamField>
+
+<ParamField path="is_fixed_seed" type="number" default="0">
+  Use fixed random seed for reproducible results.
+  
+  **Values**: `0` (disabled), `1` (enabled)
+</ParamField>
+
+<ParamField path="is_norm" type="number" default="1">
+  Normalize audio output.
+  
+  **Values**: `0` (disabled), `1` (enabled)
+</ParamField>
+
+## Response Format
+
+The API returns **binary audio data** in the specified format (WAV or MP3).
+
+- **Content-Type**: `audio/wav` or `audio/mpeg`
+- **Response Type**: Binary (arraybuffer)
+- **File Extension**: `.wav` or `.mp3`
+
+## Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://127.0.0.1:18180/v1/invoke \
+  -H "Content-Type: application/json" \
+  -d '{
+    "speaker": "550e8400-e29b-41d4-a716-446655440000",
+    "text": "你好，欢迎使用数字人系统。今天天气很好。",
+    "format": "wav",
+    "topP": 0.7,
+    "temperature": 0.7,
+    "max_new_tokens": 1024,
+    "chunk_length": 100,
+    "repetition_penalty": 1.2,
+    "need_asr": false,
+    "streaming": false,
+    "is_fixed_seed": 0,
+    "is_norm": 1,
+    "reference_audio": "asr_format_audio/20240314123456789.wav",
+    "reference_text": "欢迎使用数字人系统，这是一段参考音频"
+  }' \
+  --output output.wav
+```
+
+```javascript JavaScript
+const response = await fetch('http://127.0.0.1:18180/v1/invoke', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    speaker: '550e8400-e29b-41d4-a716-446655440000',
+    text: '你好，欢迎使用数字人系统。今天天气很好。',
+    format: 'wav',
+    topP: 0.7,
+    temperature: 0.7,
+    max_new_tokens: 1024,
+    chunk_length: 100,
+    repetition_penalty: 1.2,
+    need_asr: false,
+    streaming: false,
+    is_fixed_seed: 0,
+    is_norm: 1,
+    reference_audio: 'asr_format_audio/20240314123456789.wav',
+    reference_text: '欢迎使用数字人系统，这是一段参考音频'
+  })
+});
+
+const audioBuffer = await response.arrayBuffer();
+const blob = new Blob([audioBuffer], { type: 'audio/wav' });
+
+// Save to file or play in browser
+const url = URL.createObjectURL(blob);
+const audio = new Audio(url);
+audio.play();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'http://127.0.0.1:18180/v1/invoke',
+    json={
+        'speaker': '550e8400-e29b-41d4-a716-446655440000',
+        'text': '你好，欢迎使用数字人系统。今天天气很好。',
+        'format': 'wav',
+        'topP': 0.7,
+        'temperature': 0.7,
+        'max_new_tokens': 1024,
+        'chunk_length': 100,
+        'repetition_penalty': 1.2,
+        'need_asr': False,
+        'streaming': False,
+        'is_fixed_seed': 0,
+        'is_norm': 1,
+        'reference_audio': 'asr_format_audio/20240314123456789.wav',
+        'reference_text': '欢迎使用数字人系统，这是一段参考音频'
+    }
+)
+
+# Save audio file
+with open('output.wav', 'wb') as f:
+    f.write(response.content)
+```
+</CodeGroup>
+
+## Implementation Details
+
+The audio synthesis process (from `voice.js:46-79`):
+
+```javascript
+export async function makeAudio({voiceId, text, targetDir}) {
+  const uuid = crypto.randomUUID()
+  const voice = selectByID(voiceId)
+
+  return makeAudioApi({
+    speaker: uuid,
+    text,
+    format: 'wav',
+    topP: 0.7,
+    max_new_tokens: 1024,
+    chunk_length: 100,
+    repetition_penalty: 1.2,
+    temperature: 0.7,
+    need_asr: false,
+    streaming: false,
+    is_fixed_seed: 0,
+    is_norm: 1,
+    reference_audio: voice.asr_format_audio_url,
+    reference_text: voice.reference_audio_text
+  })
+  .then((res) => {
+    // res is binary audio data
+    fs.writeFileSync(path.join(targetDir, `${uuid}.wav`), res, 'binary')
+    return `${uuid}.wav`
+  })
+}
+```
+
+## Output Storage
+
+Generated audio files are stored in:
+
+- **Windows**: `D:\duix_avatar_data\face2face\temp\`
+- **macOS/Linux**: `~/duix_avatar_data/face2face/temp/`
+
+## Parameter Tuning Guide
+
+<AccordionGroup>
+  <Accordion title="Quality vs Speed">
+    **Higher Quality** (slower):
+    - `max_new_tokens`: 1024-2048
+    - `chunk_length`: 150-200
+    - `temperature`: 0.5-0.7
+    
+    **Faster Generation** (lower quality):
+    - `max_new_tokens`: 512-1024
+    - `chunk_length`: 50-100
+    - `temperature`: 0.8-1.0
+  </Accordion>
+  
+  <Accordion title="Voice Consistency">
+    For more consistent voice matching:
+    - Set `is_fixed_seed`: 1
+    - Lower `temperature`: 0.5-0.6
+    - Lower `topP`: 0.5-0.6
+    - Higher `repetition_penalty`: 1.3-1.5
+  </Accordion>
+  
+  <Accordion title="Natural Speech">
+    For more natural-sounding speech:
+    - `temperature`: 0.7-0.9
+    - `topP`: 0.7-0.8
+    - `repetition_penalty`: 1.1-1.2
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Text Input Tips:**
+- Keep sentences concise (under 100 characters each)
+- Use proper punctuation for natural pauses
+- Avoid special characters or emojis
+- Match language with trained model
+</Tip>
+
+<Warning>
+**Performance Considerations:**
+- Longer text takes more time to synthesize
+- First request may be slower (model loading)
+- Use WAV format for best quality
+- MP3 format for smaller file sizes
+</Warning>
+
+## Error Handling
+
+Common error scenarios:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| 400 Bad Request | Missing required parameters | Check all required fields are provided |
+| 404 Not Found | Invalid reference_audio path | Verify the audio file exists |
+| 500 Server Error | TTS engine error | Check TTS service logs, restart if needed |
+| Timeout | Text too long | Split into smaller chunks |
+
+## Next Steps
+
+After generating audio:
+
+1. Save the binary response as a WAV or MP3 file
+2. Use the audio file in the [Video Synthesis API](/api/video-synthesis) to create avatar videos
+3. Optionally, test the audio quality before video generation
+
+<CardGroup cols={2}>
+  <Card title="Video Synthesis" icon="video" href="/api/video-synthesis">
+    Create videos with your synthesized audio
+  </Card>
+  <Card title="Model Training" icon="brain" href="/api/model-training">
+    Train new voice models
+  </Card>
+</CardGroup>

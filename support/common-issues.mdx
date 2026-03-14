@@ -1,0 +1,661 @@
+---
+title: Common Issues
+description: Solutions to frequently encountered problems with Duix Avatar
+---
+
+This page provides solutions to common issues you may encounter when installing or using Duix Avatar. Before troubleshooting, complete the [self-check steps](/support/faq#what-should-i-do-before-asking-for-help) first.
+
+## Installation Issues
+
+### Docker Services Won't Start
+
+<AccordionGroup>
+  <Accordion title="Error: 'docker-compose' is not recognized (Windows)">
+    **Symptoms:**
+    - Command not found error when running `docker-compose`
+    - Docker Desktop installed but commands don't work
+    
+    **Solution:**
+    ```powershell
+    # Check if Docker Desktop is running
+    # Look for Docker icon in system tray
+    
+    # Verify Docker installation
+    docker --version
+    docker-compose --version
+    
+    # If docker-compose not found, restart Docker Desktop
+    # Or reinstall Docker Desktop from docker.com
+    ```
+    
+    **Alternative:** Use `docker compose` (without hyphen) in newer Docker versions:
+    ```powershell
+    docker compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="WSL 2 installation is incomplete (Windows)">
+    **Symptoms:**
+    - Docker Desktop won't start
+    - Error message about WSL 2
+    
+    **Solution:**
+    ```powershell
+    # Check WSL installation
+    wsl --list --verbose
+    
+    # If WSL not installed, install it
+    wsl --install
+    
+    # Update WSL to latest version
+    wsl --update
+    
+    # Restart computer after installation
+    ```
+    
+    See [Windows Installation Guide](/getting-started/windows-installation) for detailed WSL setup.
+  </Accordion>
+
+  <Accordion title="Cannot connect to Docker daemon (Linux)">
+    **Symptoms:**
+    - Error: "Cannot connect to the Docker daemon"
+    - Permission denied errors
+    
+    **Solution:**
+    ```bash
+    # Start Docker service
+    sudo systemctl start docker
+    
+    # Enable Docker to start on boot
+    sudo systemctl enable docker
+    
+    # Add your user to docker group (avoid using sudo)
+    sudo usermod -aG docker $USER
+    
+    # Log out and log back in for group changes to take effect
+    # Or run: newgrp docker
+    
+    # Verify Docker is running
+    docker ps
+    ```
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    **Symptoms:**
+    - Error: "port is already allocated"
+    - Services fail to start due to port conflicts
+    
+    **Solution:**
+    ```bash
+    # Check what's using the ports (18180, 10095, 8383)
+    # Windows PowerShell:
+    netstat -ano | findstr ":18180"
+    netstat -ano | findstr ":10095"
+    netstat -ano | findstr ":8383"
+    
+    # Linux:
+    sudo lsof -i :18180
+    sudo lsof -i :10095
+    sudo lsof -i :8383
+    
+    # Stop conflicting services or change ports in docker-compose.yml
+    # See Configuration guide for port customization
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### NVIDIA GPU Issues
+
+<AccordionGroup>
+  <Accordion title="NVIDIA driver not found or nvidia-smi fails">
+    **Symptoms:**
+    - `nvidia-smi` command not found
+    - Docker containers can't access GPU
+    - Error: "could not select device driver"
+    
+    **Solution for Windows:**
+    ```powershell
+    # Download and install NVIDIA drivers
+    # Visit: https://www.nvidia.cn/drivers/lookup/
+    
+    # After installation, verify:
+    nvidia-smi
+    
+    # Should display GPU information
+    # If not, restart computer and try again
+    ```
+    
+    **Solution for Linux:**
+    ```bash
+    # Check if driver is installed
+    nvidia-smi
+    
+    # Install NVIDIA driver if missing
+    sudo ubuntu-drivers autoinstall
+    
+    # Or install specific version
+    sudo apt install nvidia-driver-535
+    
+    # Reboot after installation
+    sudo reboot
+    
+    # Verify after reboot
+    nvidia-smi
+    ```
+  </Accordion>
+
+  <Accordion title="Docker containers can't access GPU (Linux)">
+    **Symptoms:**
+    - Services start but fail to use GPU
+    - Error about CUDA not available
+    - Slow performance (running on CPU)
+    
+    **Solution:**
+    ```bash
+    # Install NVIDIA Container Toolkit
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+      && curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add - \
+      && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    
+    # Update and install
+    sudo apt-get update
+    sudo apt-get install -y nvidia-container-toolkit
+    
+    # Configure Docker
+    sudo nvidia-ctk runtime configure --runtime=docker
+    
+    # Restart Docker
+    sudo systemctl restart docker
+    
+    # Test GPU access
+    docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
+    ```
+    
+    See [NVIDIA GPU Setup](/deployment/nvidia-gpu-setup) for complete instructions.
+  </Accordion>
+
+  <Accordion title="CUDA out of memory (OOM) errors">
+    **Symptoms:**
+    - Video generation fails
+    - Error: "CUDA out of memory"
+    - Service crashes during processing
+    
+    **Solution:**
+    ```bash
+    # Check GPU memory usage
+    nvidia-smi
+    
+    # Close other GPU-intensive applications
+    # - Machine learning applications
+    # - Games
+    # - Video editing software
+    # - Multiple browser tabs with hardware acceleration
+    
+    # Restart Docker services to free memory
+    docker restart duix-avatar-gen-video
+    docker restart duix-avatar-tts
+    
+    # For persistent issues, edit docker-compose.yml
+    # Reduce batch size or use smaller models
+    ```
+    
+    **GPU Memory Requirements:**
+    - RTX 3090 (24GB): Comfortable for most tasks
+    - RTX 4070 (12GB): Adequate for standard use
+    - RTX 3060 (8GB): Minimum, may struggle with long videos
+  </Accordion>
+
+  <Accordion title="RTX 50 series GPU not working">
+    **Symptoms:**
+    - RTX 5090 or 5080 not detected
+    - CUDA compatibility errors
+    
+    **Solution:**
+    Use the special docker-compose configuration for RTX 50 series:
+    ```bash
+    cd deploy
+    docker-compose -f docker-compose-5090.yml up -d
+    ```
+    
+    This configuration uses PyTorch preview version with CUDA 12.8 support.
+    
+    <Note>The 5090 configuration also works for RTX 30/40 series cards.</Note>
+  </Accordion>
+</AccordionGroup>
+
+## Runtime Issues
+
+### Service Errors
+
+<AccordionGroup>
+  <Accordion title="Service container keeps restarting">
+    **Symptoms:**
+    - Service status shows "Restarting"
+    - Container starts then immediately stops
+    
+    **Solution:**
+    ```bash
+    # Check service logs
+    docker logs duix-avatar-tts
+    docker logs duix-avatar-asr
+    docker logs duix-avatar-gen-video
+    
+    # Common causes:
+    # 1. Missing volume mounts - check data directories exist
+    # 2. Port conflicts - see port troubleshooting above
+    # 3. Insufficient GPU memory - check nvidia-smi
+    # 4. Corrupted image - try pulling fresh image
+    
+    # Pull fresh images
+    docker-compose pull
+    docker-compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="TTS service fails (port 18180)">
+    **Symptoms:**
+    - Voice synthesis doesn't work
+    - Cannot connect to TTS API
+    - Port 18180 not responding
+    
+    **Solution:**
+    ```bash
+    # Check if service is running
+    docker ps | grep duix-avatar-tts
+    
+    # View service logs
+    docker logs duix-avatar-tts
+    
+    # Restart TTS service
+    docker restart duix-avatar-tts
+    
+    # Test API endpoint
+    curl http://127.0.0.1:18180/health
+    
+    # Check volume mount (voice training data)
+    # Windows: D:\duix_avatar_data\voice\data should exist
+    # Linux: /path/to/duix_avatar_data/voice/data should exist
+    ```
+  </Accordion>
+
+  <Accordion title="ASR service fails (port 10095)">
+    **Symptoms:**
+    - Audio transcription doesn't work
+    - Model training fails at ASR step
+    
+    **Solution:**
+    ```bash
+    # Check service status
+    docker ps | grep duix-avatar-asr
+    
+    # View logs
+    docker logs duix-avatar-asr
+    
+    # Restart service
+    docker restart duix-avatar-asr
+    
+    # Verify GPU access
+    docker exec duix-avatar-asr nvidia-smi
+    ```
+  </Accordion>
+
+  <Accordion title="Video generation service fails (port 8383)">
+    **Symptoms:**
+    - Video synthesis stuck at "pending"
+    - Service not responding on port 8383
+    
+    **Solution:**
+    ```bash
+    # Check service status
+    docker ps | grep duix-avatar-gen-video
+    
+    # View detailed logs
+    docker logs -f duix-avatar-gen-video
+    
+    # Check GPU memory
+    nvidia-smi
+    
+    # Restart service
+    docker restart duix-avatar-gen-video
+    
+    # Check volume mount (video data)
+    # Windows: D:\duix_avatar_data\face2face should exist
+    # Linux: /path/to/duix_avatar_data/face2face should exist
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Client Application Issues
+
+<AccordionGroup>
+  <Accordion title="Client can't connect to server">
+    **Symptoms:**
+    - Error: "Connection refused"
+    - Client shows all services offline
+    
+    **Solution:**
+    1. **Verify services are running:**
+       ```bash
+       docker ps
+       # Should show 3 running containers
+       ```
+    
+    2. **Test API endpoints:**
+       ```bash
+       # Windows PowerShell or Linux terminal
+       curl http://127.0.0.1:18180/
+       curl http://127.0.0.1:10095/
+       curl http://127.0.0.1:8383/
+       ```
+    
+    3. **Check firewall settings:**
+       - Windows: Allow Docker through Windows Firewall
+       - Linux: Check iptables rules
+    
+    4. **Restart client application**
+  </Accordion>
+
+  <Accordion title="Ubuntu AppImage won't launch">
+    **Symptoms:**
+    - Double-clicking AppImage does nothing
+    - Permission denied errors
+    
+    **Solution:**
+    ```bash
+    # Make AppImage executable
+    chmod +x Duix.Avatar-*.AppImage
+    
+    # Launch from terminal
+    ./Duix.Avatar-*.AppImage
+    
+    # If running as root user, use:
+    ./Duix.Avatar-*.AppImage --no-sandbox
+    ```
+    
+    <Warning>
+    It's recommended to run as a regular user, not root. Create a non-root user if needed.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Version mismatch between client and server">
+    **Symptoms:**
+    - Client shows errors about incompatible versions
+    - Features don't work as expected
+    
+    **Solution:**
+    ```bash
+    # Update server (pull latest images)
+    cd deploy
+    docker-compose pull
+    docker-compose up -d
+    
+    # Update client
+    # Download latest release from:
+    # https://github.com/duixcom/Duix-Avatar/releases
+    ```
+    
+    <Tip>
+    Always keep client and server versions in sync. Check GitHub releases regularly for updates.
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+### Model and Video Issues
+
+<AccordionGroup>
+  <Accordion title="Model training fails or gets stuck">
+    **Symptoms:**
+    - Training progress never completes
+    - Error during audio extraction
+    - Voice model not created
+    
+    **Solution:**
+    ```bash
+    # Check TTS and ASR services are running
+    docker ps
+    
+    # View TTS service logs
+    docker logs -f duix-avatar-tts
+    
+    # Common issues:
+    # 1. Invalid video format - use MP4/H.264
+    # 2. Video too long - keep under 5 minutes for training
+    # 3. No audio in video - ensure video has clear speech
+    # 4. Data directory missing - check volume mounts
+    
+    # Delete failed model and try again with different video
+    ```
+    
+    **Video Requirements for Training:**
+    - Format: MP4 (H.264 codec)
+    - Duration: 1-5 minutes recommended
+    - Audio: Clear speech, minimal background noise
+    - Video: Front-facing, good lighting, stable camera
+  </Accordion>
+
+  <Accordion title="Generated video has no sound or poor audio sync">
+    **Symptoms:**
+    - Video plays but no audio
+    - Lip movements don't match speech
+    - Audio cuts off early
+    
+    **Solution:**
+    1. **Check source audio:**
+       - Verify audio file format (WAV recommended)
+       - Test audio plays correctly before synthesis
+    
+    2. **Regenerate video:**
+       - Delete failed video
+       - Create new synthesis task
+    
+    3. **Check video generation logs:**
+       ```bash
+       docker logs duix-avatar-gen-video | grep -i audio
+       ```
+    
+    4. **Verify FFmpeg processing:**
+       - Audio extraction might have failed
+       - Check client logs for FFmpeg errors
+  </Accordion>
+
+  <Accordion title="Video generation stuck at 'waiting' or 'pending'">
+    **Symptoms:**
+    - Video status never changes from "waiting"
+    - Progress bar doesn't move
+    
+    **Solution:**
+    ```bash
+    # Check video generation service
+    docker logs -f duix-avatar-gen-video
+    
+    # Look for error messages or crashes
+    
+    # Check if previous video is still processing
+    # Only one video processes at a time
+    
+    # Restart video service if stuck
+    docker restart duix-avatar-gen-video
+    
+    # Check database for task status
+    # Client stores tasks in SQLite database
+    ```
+    
+    **Queue Behavior:**
+    - Videos process one at a time (sequential)
+    - "Waiting" = in queue, not started yet
+    - "Pending" = currently processing
+    - Check progress number (e.g., "2 / 5" means 2nd in queue of 5)
+  </Accordion>
+
+  <Accordion title="Cannot delete model or video">
+    **Symptoms:**
+    - Delete button doesn't work
+    - Error when trying to remove items
+    
+    **Solution:**
+    1. **Close any open videos using the model**
+    2. **Stop any pending video tasks**
+    3. **Restart client application**
+    4. **Check file permissions on data directory**
+    
+    Manual cleanup if needed:
+    ```bash
+    # Windows
+    # Check: D:\duix_avatar_data\
+    
+    # Linux
+    # Check: /path/to/duix_avatar_data/
+    
+    # Do not delete files while services are running
+    # Stop services first: docker-compose down
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="Video generation is very slow">
+    **Possible causes and solutions:**
+    
+    **1. GPU not being used (running on CPU):**
+    ```bash
+    # Check GPU utilization during processing
+    watch nvidia-smi
+    # GPU utilization should be 80-100% during synthesis
+    
+    # If GPU is idle, check NVIDIA Container Toolkit installation
+    ```
+    
+    **2. Insufficient GPU memory:**
+    - Close other GPU applications
+    - Process shorter videos
+    - Use lower resolution source videos
+    
+    **3. Disk I/O bottleneck:**
+    - Ensure data directory is on fast SSD
+    - Close disk-intensive applications
+    - Check disk space (need 30GB+ free)
+    
+    **4. System resources:**
+    - Close unnecessary applications
+    - Ensure 32GB RAM is available
+    - Check CPU usage (should not be 100%)
+  </Accordion>
+
+  <Accordion title="Out of disk space">
+    **Symptoms:**
+    - Services fail with write errors
+    - Video generation fails
+    - Cannot create new models
+    
+    **Solution:**
+    ```bash
+    # Check disk usage
+    # Windows:
+    Get-PSDrive
+    
+    # Linux:
+    df -h
+    
+    # Free up space:
+    # 1. Delete old/unused avatar models
+    # 2. Delete old generated videos
+    # 3. Clean Docker images and containers
+    docker system prune -a
+    
+    # 4. Move data directory to larger drive (edit docker-compose.yml)
+    ```
+    
+    **Space Requirements:**
+    - Docker images: ~70GB (one-time)
+    - Each avatar model: ~500MB
+    - Each generated video: ~50MB per minute
+    - Recommended free space: 100GB+
+  </Accordion>
+</AccordionGroup>
+
+## Data and Privacy
+
+<AccordionGroup>
+  <Accordion title="Where is my data stored?">
+    **Windows:**
+    - Models: `D:\duix_avatar_data\face2face\`
+    - Voice data: `D:\duix_avatar_data\voice\`
+    - Videos: `D:\duix_avatar_data\face2face\`
+    
+    **Linux:**
+    - Configured in `docker-compose-linux.yml`
+    - Default: `/home/user/duix_avatar_data/`
+    
+    **Database:**
+    - Client stores metadata in SQLite
+    - Windows: `%APPDATA%\Duix.Avatar\`
+    - Linux: `~/.config/Duix.Avatar/`
+  </Accordion>
+
+  <Accordion title="How do I back up my avatars?">
+    ```bash
+    # Stop services before backup
+    docker-compose down
+    
+    # Windows - Copy entire data directory
+    robocopy D:\duix_avatar_data\ E:\Backup\duix_avatar_data\ /E
+    
+    # Linux - Use rsync or tar
+    tar -czf duix_backup.tar.gz /path/to/duix_avatar_data/
+    
+    # Or use rsync
+    rsync -av /path/to/duix_avatar_data/ /backup/location/
+    
+    # Restart services
+    docker-compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="Is my data sent to the internet?">
+    **No.** Duix Avatar operates 100% offline:
+    
+    - ✅ All processing happens locally
+    - ✅ No data transmission to external servers
+    - ✅ No telemetry or analytics
+    - ✅ Complete privacy protection
+    
+    The only network usage is:
+    - Initial Docker image download (one-time)
+    - Software updates (when you choose to update)
+    - GitHub issues (if you report bugs)
+    
+    You can verify by monitoring network traffic or disconnecting from internet during use.
+  </Accordion>
+</AccordionGroup>
+
+## Still Need Help?
+
+If your issue isn't covered here:
+
+<Steps>
+  <Step title="Check Documentation">
+    Review the [Troubleshooting Guide](/deployment/troubleshooting) for detailed debugging steps
+  </Step>
+  
+  <Step title="Search GitHub Issues">
+    Search [existing issues](https://github.com/duixcom/Duix-Avatar/issues) - your problem may already be solved
+  </Step>
+  
+  <Step title="Collect Information">
+    Gather logs, error messages, and system information before reporting
+  </Step>
+  
+  <Step title="Report Issue">
+    Create a new [GitHub issue](https://github.com/duixcom/Duix-Avatar/issues/new) with:
+    - Clear description of the problem
+    - Steps to reproduce
+    - Error logs (client and server)
+    - System info (OS, GPU, driver versions)
+  </Step>
+</Steps>
+
+<Card title="Contact Support" icon="envelope" href="/support/contact">
+  Get help from the community or reach out to the team
+</Card>

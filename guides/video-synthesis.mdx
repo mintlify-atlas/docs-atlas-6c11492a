@@ -1,0 +1,368 @@
+---
+title: Video Synthesis
+description: Learn how to generate realistic talking head videos with your digital avatars
+---
+
+## Overview
+
+Video synthesis in Duix Avatar combines your avatar model with cloned voices or custom audio to create realistic talking head videos. The process uses face-to-face (F2F) video generation technology to animate your avatar with synchronized lip movements.
+
+## Video Synthesis Workflow
+
+The synthesis process consists of two main phases:
+1. **Video Creation**: Prepare audio and submit synthesis request
+2. **Status Monitoring**: Track progress and retrieve completed video
+
+## Creating a Video
+
+<Steps>
+  <Step title="Save Video Configuration">
+    First, configure your video settings:
+
+    ```javascript
+    // From src/main/service/video.js:63
+    function saveVideo({ id, model_id, name, text_content, voice_id, audio_path }) {
+      const video = selectVideoByID(id)
+      
+      // Copy custom audio if provided
+      if(audio_path){
+        audio_path = copyAudio4Video(audio_path)
+      }
+
+      if (video) {
+        // Update existing draft
+        return update({ id, model_id, name, text_content, voice_id, audio_path })
+      }
+      
+      // Create new draft
+      return insertVideo({ 
+        model_id, 
+        name, 
+        status: 'draft', 
+        text_content, 
+        voice_id, 
+        audio_path 
+      })
+    }
+    ```
+    
+    **Parameters:**
+    - `model_id`: Avatar model to use
+    - `name`: Video name/title
+    - `text_content`: Text to speak (for TTS)
+    - `voice_id`: Voice model for TTS
+    - `audio_path`: Custom audio file (optional)
+  </Step>
+
+  <Step title="Queue Video for Synthesis">
+    Start the synthesis process:
+    
+    ```javascript
+    // From src/main/service/video.js:81
+    function makeVideo(videoId) {
+      update({ id: videoId, status: 'waiting' })
+      return videoId
+    }
+    ```
+    
+    The video is added to the synthesis queue with `waiting` status.
+  </Step>
+
+  <Step title="Synthesize Video">
+    The `synthesisVideo` function handles the actual synthesis:
+    
+    ```javascript
+    // From src/main/service/video.js:86
+    export async function synthesisVideo(videoId) {
+      try{
+        // Update status to pending
+        update({
+          id: videoId,
+          file_path: null,
+          status: 'pending',
+          message: '正在提交任务',
+        })
+
+        // Get video configuration
+        const video = selectVideoByID(videoId)
+        const model = selectF2FModelByID(video.model_id)
+
+        let audioPath
+        if(video.audio_path){
+          // Use custom audio
+          audioPath = video.audio_path
+        }else{
+          // Generate TTS audio
+          const voice = selectVoiceByID(video.voice_id || model.voice_id)
+          audioPath = await makeAudio4Video({
+            voiceId: voice.id,
+            text: video.text_content
+          })
+        }
+
+        // Submit to F2F API
+        const { result, param } = await makeVideoByF2F(
+          audioPath, 
+          model.video_path
+        )
+
+        // Update status based on result
+        if(10000 === result.code){ 
+          update({
+            id: videoId,
+            status: 'pending',
+            message: result,
+            audio_path: audioPath,
+            param,
+            code: param.code
+          })
+        }else{ 
+          update({
+            id: videoId,
+            status: 'failed',
+            message: result.msg,
+          })
+        }
+      } catch (error) {
+        updateStatus(videoId, 'failed', error.message)
+      }
+      return videoId
+    }
+    ```
+  </Step>
+</Steps>
+
+## Face-to-Face Video Generation
+
+The F2F API creates talking head videos by combining audio with avatar video:
+
+```javascript
+// From src/main/service/video.js:259
+async function makeVideoByF2F(audioPath, videoPath) {
+  const uuid = crypto.randomUUID()
+  const param = {
+    audio_url: audioPath,      // Audio file path
+    video_url: videoPath,      // Avatar video path
+    code: uuid,                // Unique task identifier
+    chaofen: 0,                // Super resolution (disabled)
+    watermark_switch: 0,       // Watermark (disabled)
+    pn: 1                      // Priority number
+  }
+  const result = await makeVideoApi(param)
+  return { param, result }
+}
+```
+
+### F2F Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `audio_url` | string | Path to audio file |
+| `video_url` | string | Path to avatar video |
+| `code` | string | Unique task identifier (UUID) |
+| `chaofen` | number | Super resolution (0=off, 1=on) |
+| `watermark_switch` | number | Watermark overlay (0=off, 1=on) |
+| `pn` | number | Priority number for queue |
+
+<Note>
+The `code` parameter is a UUID that uniquely identifies the synthesis task for status tracking.
+</Note>
+
+## Video Status Monitoring
+
+Duix Avatar continuously monitors video synthesis progress:
+
+```javascript
+// From src/main/service/video.js:162
+export async function loopPending() {
+  const video = findFirstByStatus('pending')
+  if (!video) {
+    synthesisNext()
+    setTimeout(() => {
+      loopPending()
+    }, 2000)
+    return
+  }
+
+  const statusRes = await getVideoStatus(video.code)
+
+  if ([9999, 10002, 10003].includes(statusRes.code)) {
+    // Failed
+    updateStatus(video.id, 'failed', statusRes.msg)
+  } else if (statusRes.code === 10000) {
+    if (statusRes.data.status === 1) {
+      // Processing
+      updateStatus(
+        video.id,
+        'pending',
+        statusRes.data.msg,
+        statusRes.data.progress,
+      )
+    }else if (statusRes.data.status === 2) { 
+      // Success - get video duration
+      const resultPath = path.join(assetPath.model, statusRes.data.result)
+      const duration = await getVideoDuration(resultPath)
+
+      update({
+        id: video.id,
+        status: 'success',
+        message: statusRes.data.msg,
+        progress: statusRes.data.progress,
+        file_path: statusRes.data.result,
+        duration
+      })
+    } else if (statusRes.data.status === 3) {
+      // Failed
+      updateStatus(video.id, 'failed', statusRes.data.msg)
+    }
+  }
+
+  setTimeout(() => {
+    loopPending()
+  }, 2000)
+}
+```
+
+### Status Codes
+
+| Code | Meaning |
+|------|--------|
+| 10000 | Request successful |
+| 9999 | Request failed |
+| 10002 | Invalid parameters |
+| 10003 | Service error |
+
+### Synthesis Status
+
+| Status | Description |
+|--------|-------------|
+| draft | Video configuration saved |
+| waiting | Queued for synthesis |
+| pending | Synthesis in progress |
+| success | Video ready |
+| failed | Synthesis failed |
+
+<Tip>
+The system polls for status updates every 2 seconds to provide real-time progress tracking.
+</Tip>
+
+## Queue Management
+
+Videos are processed sequentially from the queue:
+
+```javascript
+// From src/main/service/video.js:218
+function synthesisNext() {
+  const video = findFirstByStatus('waiting')
+  if (video) {
+    synthesisVideo(video.id)
+  }
+}
+```
+
+When a video completes or fails, the next waiting video automatically starts processing.
+
+## Progress Tracking
+
+For videos in the waiting queue, progress shows queue position:
+
+```javascript
+// From src/main/service/video.js:29
+function page({ page, pageSize, name = '' }) {
+  const waitingVideos = selectByStatus('waiting').map((v) => v.id)
+  const list = selectPage({ page, pageSize, name }).map((video) => {
+    if(video.status === 'waiting'){
+      video.progress = `${waitingVideos.indexOf(video.id) + 1} / ${waitingVideos.length}`
+    }
+    return video
+  })
+  return { total: count(name), list }
+}
+```
+
+<Note>
+Progress format: "current position / total in queue" (e.g., "2 / 5" means 2nd in line out of 5 videos)
+</Note>
+
+## Audio Options
+
+### Text-to-Speech
+
+Generate audio from text using a cloned voice:
+
+```javascript
+const voice = selectVoiceByID(video.voice_id || model.voice_id)
+audioPath = await makeAudio4Video({
+  voiceId: voice.id,
+  text: video.text_content
+})
+```
+
+### Custom Audio
+
+Use pre-recorded or edited audio files:
+
+```javascript
+if(video.audio_path){
+  audioPath = video.audio_path
+}
+```
+
+<Warning>
+Custom audio files must be in WAV format for optimal compatibility with the F2F synthesis engine.
+</Warning>
+
+## Best Practices
+
+### Video Quality
+
+1. **Avatar Selection**: Use high-quality avatar videos for best results
+2. **Audio Quality**: Ensure clear audio without distortion
+3. **Duration**: Keep videos under 2 minutes for faster processing
+4. **Format**: WAV audio format provides best lip-sync results
+
+### Performance
+
+<Tip>
+**Optimization tips:**
+- Queue multiple videos for batch processing
+- Use TTS for consistent audio quality
+- Reuse voice models across videos
+- Monitor queue position for planning
+</Tip>
+
+### Error Handling
+
+1. **Failed Synthesis**: Check audio and video file integrity
+2. **Long Queue Times**: Consider processing during off-peak hours
+3. **Quality Issues**: Try different avatar videos or audio samples
+
+## Retrieving Completed Videos
+
+Once synthesis completes successfully:
+
+```javascript
+// From src/main/service/video.js:51
+function findVideo(videoId) {
+  const video = selectVideoByID(videoId)
+  return {
+    ...video,
+    file_path: video.file_path ? 
+      path.join(assetPath.model, video.file_path) : 
+      video.file_path
+  }
+}
+```
+
+The completed video includes:
+- `file_path`: Full path to synthesized video
+- `duration`: Video length in seconds
+- `status`: "success"
+- `audio_path`: Path to audio used
+- `progress`: "100%"
+
+## Next Steps
+
+- Learn how to [Export Videos](/guides/exporting-videos) for sharing
+- Manage your videos with [Managing Models](/guides/managing-models)
+- Explore [Voice Cloning](/guides/voice-cloning) for better TTS results

@@ -1,0 +1,345 @@
+---
+title: 'Features'
+description: 'Discover the powerful capabilities that make Duix Avatar the leading open-source AI avatar toolkit'
+---
+
+# Core Features
+
+Duix Avatar leverages advanced AI algorithms to deliver ultra-realistic digital human cloning and video synthesis. Explore the six key features that power this innovative platform.
+
+<CardGroup cols={2}>
+  <Card title="Precise Appearance Cloning" icon="user">
+    Advanced computer vision captures facial features, contours, and expressions with high precision to build realistic virtual models.
+  </Card>
+  <Card title="Voice Cloning Technology" icon="microphone">
+    Precisely clone voices by capturing subtle characteristics including context, intonation, and speech patterns with customizable parameters.
+  </Card>
+  <Card title="Multi-Language Support" icon="language">
+    Generate avatars in 8 languages: English, Japanese, Korean, Chinese, French, German, Arabic, and Spanish.
+  </Card>
+  <Card title="Efficient Video Synthesis" icon="video">
+    High-precision lip-sync with intelligent audio-video synchronization for natural and smooth digital human videos.
+  </Card>
+  <Card title="Fully Offline Operation" icon="shield">
+    No internet connection required. All processing runs locally to protect your privacy and data security.
+  </Card>
+  <Card title="Multiple Model Management" icon="layer-group">
+    Import and manage multiple avatar models with one-click startup packages for different creative scenarios.
+  </Card>
+</CardGroup>
+
+---
+
+## AI-Powered Voice Cloning
+
+Duix Avatar's voice cloning technology uses advanced AI to generate highly similar voices based on input samples. The system captures every nuance of human speech.
+
+### Technical Implementation
+
+The voice cloning pipeline consists of three main stages:
+
+**1. Audio Preprocessing & ASR**
+
+When you upload a video to create an avatar, the system uses FFmpeg to extract audio:
+
+```javascript
+// From src/main/util/ffmpeg.js
+export function extractAudio(videoPath, audioPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .noVideo()
+      .save(audioPath)
+      .on('end', () => resolve(true))
+      .on('error', (err) => reject(err))
+  })
+}
+```
+
+The extracted audio is then processed by the **FunASR** service (running on port 10095) for automatic speech recognition.
+
+**2. Voice Training**
+
+The preprocessed audio undergoes training via the Fish Speech API:
+
+```javascript
+// From src/main/service/voice.js
+export async function train(path, lang = 'zh') {
+  const res = await preprocessAndTran({
+    format: path.split('.').pop(),
+    reference_audio: path,
+    lang
+  })
+  
+  if (res.code === 0) {
+    const { asr_format_audio_url, reference_audio_text } = res
+    return insert({ 
+      origin_audio_path: path, 
+      lang, 
+      asr_format_audio_url, 
+      reference_audio_text 
+    })
+  }
+}
+```
+
+**3. Audio Synthesis**
+
+Generate new audio using the cloned voice with fine-tuned parameters:
+
+```javascript
+// From src/main/service/voice.js
+export async function makeAudio({voiceId, text, targetDir}) {
+  const voice = selectByID(voiceId)
+  
+  return makeAudioApi({
+    speaker: uuid,
+    text,
+    format: 'wav',
+    topP: 0.7,                    // Nucleus sampling probability
+    max_new_tokens: 1024,          // Maximum tokens to generate
+    chunk_length: 100,             // Audio chunk size
+    repetition_penalty: 1.2,       // Prevent repetitive speech
+    temperature: 0.7,              // Randomness control
+    is_norm: 1,                    // Audio normalization
+    reference_audio: voice.asr_format_audio_url,
+    reference_text: voice.reference_audio_text
+  })
+}
+```
+
+<Note>
+The TTS service runs on **port 18180** using the `guiji2025/fish-speech-ziming` Docker image with NVIDIA GPU acceleration.
+</Note>
+
+### Supported Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `topP` | 0.7 | Nucleus sampling for natural variation |
+| `temperature` | 0.7 | Controls output randomness |
+| `repetition_penalty` | 1.2 | Reduces repetitive phrases |
+| `max_new_tokens` | 1024 | Maximum audio length |
+| `chunk_length` | 100 | Processing chunk size |
+
+---
+
+## Automatic Speech Recognition (ASR)
+
+Duix Avatar uses **FunASR** technology to convert speech into computer-readable text. This enables:
+
+- Accurate transcription of reference audio during voice training
+- Multi-language support across 8 languages
+- Real-time speech-to-text conversion for avatar control
+
+### Docker Configuration
+
+```yaml
+duix-avatar-asr:
+  image: guiji2025/fun-asr
+  container_name: duix-avatar-asr
+  restart: always
+  runtime: nvidia
+  ports:
+    - '10095:10095'
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+```
+
+---
+
+## Text-to-Speech (TTS) Engine
+
+The TTS engine converts text into natural, fluent speech that drives your virtual avatar. Built on Fish Speech technology, it produces high-quality audio with emotional intonation.
+
+### API Endpoint
+
+**Audio Synthesis**: `http://127.0.0.1:18180/v1/invoke`
+
+**Voice Training**: `http://127.0.0.1:18180/v1/preprocess_and_tran`
+
+### Example Request
+
+```json
+{
+  "speaker": "{uuid}",
+  "text": "Hello, I am your AI avatar.",
+  "format": "wav",
+  "topP": 0.7,
+  "max_new_tokens": 1024,
+  "chunk_length": 100,
+  "repetition_penalty": 1.2,
+  "temperature": 0.7,
+  "need_asr": false,
+  "streaming": false,
+  "is_fixed_seed": 0,
+  "is_norm": 1,
+  "reference_audio": "{voice.asr_format_audio_url}",
+  "reference_text": "{voice.reference_audio_text}"
+}
+```
+
+---
+
+## Computer Vision for Lip-Sync
+
+Duix Avatar's computer vision technology ensures perfect synchronization between audio and lip movements. The face-to-face video generation engine analyzes facial features and creates natural expressions.
+
+### Video Synthesis Workflow
+
+```javascript
+// From src/main/service/video.js
+async function makeVideoByF2F(audioPath, videoPath) {
+  const uuid = crypto.randomUUID()
+  const param = {
+    audio_url: audioPath,
+    video_url: videoPath,
+    code: uuid,
+    chaofen: 0,              // Super resolution disabled
+    watermark_switch: 0,     // No watermark
+    pn: 1                    // Processing number
+  }
+  const result = await makeVideoApi(param)
+  return { param, result }
+}
+```
+
+### API Endpoints
+
+**Submit Video Synthesis**: `http://127.0.0.1:8383/easy/submit`
+
+**Query Progress**: `http://127.0.0.1:8383/easy/query?code={taskCode}`
+
+### Processing Pipeline
+
+<Steps>
+  <Step title="Video Upload">
+    Upload source video and extract audio using FFmpeg
+  </Step>
+  <Step title="Audio Generation">
+    Synthesize speech using cloned voice and input text
+  </Step>
+  <Step title="Lip-Sync Processing">
+    Computer vision analyzes facial features and synchronizes lip movements
+  </Step>
+  <Step title="Video Export">
+    Final video with natural expressions and perfect audio-video sync
+  </Step>
+</Steps>
+
+### Status Tracking
+
+```javascript
+// From src/main/service/video.js
+export async function loopPending() {
+  const video = findFirstByStatus('pending')
+  const statusRes = await getVideoStatus(video.code)
+  
+  if (statusRes.code === 10000) {
+    if (statusRes.data.status === 1) {
+      // Processing - update progress
+      updateStatus(video.id, 'pending', statusRes.data.msg, statusRes.data.progress)
+    } else if (statusRes.data.status === 2) {
+      // Success - calculate duration and save
+      const resultPath = path.join(assetPath.model, statusRes.data.result)
+      const duration = await getVideoDuration(resultPath)
+      update({ id: video.id, status: 'success', file_path: statusRes.data.result, duration })
+    } else if (statusRes.data.status === 3) {
+      // Failed
+      updateStatus(video.id, 'failed', statusRes.data.msg)
+    }
+  }
+}
+```
+
+---
+
+## Video Codec Optimization
+
+All videos are automatically converted to H.264 format for optimal compatibility and quality.
+
+```javascript
+// From src/main/util/ffmpeg.js
+export async function toH264(videoPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .videoCodec('libx264')
+      .outputOptions('-pix_fmt yuv420p')
+      .save(outputPath)
+      .on('end', () => resolve(true))
+      .on('error', (err) => reject(err))
+  })
+}
+```
+
+<Note>
+**Hardware Acceleration**: Duix Avatar leverages NVIDIA GPUs for accelerated video processing. Recommended configuration: RTX 4070 with 32GB RAM.
+</Note>
+
+---
+
+## Docker-Based Architecture
+
+Duix Avatar uses a microservices architecture with three core Docker containers:
+
+```yaml
+services:
+  # TTS Service - Fish Speech
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    ports: ['18180:8080']
+    volumes:
+      - d:/duix_avatar_data/voice/data:/code/data
+  
+  # ASR Service - FunASR
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    ports: ['10095:10095']
+  
+  # Video Generation Service
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    ports: ['8383:8383']
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+    shm_size: '8g'
+```
+
+### Resource Requirements
+
+<Accordion title="Hardware Specifications">
+  - **CPU**: 13th Gen Intel Core i5-13400F or better
+  - **Memory**: 32GB RAM (required)
+  - **GPU**: NVIDIA RTX 4070 or better
+  - **Storage**: 100GB+ free space for models and data
+  - **Drive Layout**: D: drive with 30GB+ for avatar data, C: drive with 100GB+ for Docker images
+</Accordion>
+
+<Accordion title="GPU Support">
+  Duix Avatar requires an NVIDIA GPU with properly installed drivers:
+  
+  - Supports RTX 30/40/50 series
+  - CUDA 12.8+ for RTX 50 series
+  - NVIDIA Container Toolkit for Docker GPU access
+  - Verified on RTX 5090, 4070, and compatible cards
+</Accordion>
+
+---
+
+## Privacy-First Design
+
+<Warning>
+**100% Offline**: Duix Avatar operates entirely offline. No data is transmitted over the internet, ensuring complete privacy and security for your digital human creation.
+</Warning>
+
+All processing happens locally:
+- Voice cloning and training
+- Video synthesis and lip-sync
+- Model storage and management
+- Audio generation
+
+Your data never leaves your machine.

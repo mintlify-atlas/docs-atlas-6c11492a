@@ -1,0 +1,294 @@
+---
+title: Contact & Community
+description: Get help, report issues, and connect with the Duix Avatar community
+---
+
+## Get Support
+
+Duix Avatar is an open-source project with an active community. Choose the best channel for your needs:
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/duixcom/Duix-Avatar/issues">
+    Report bugs, request features, or search existing issues
+  </Card>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/duixcom/Duix-Avatar/discussions">
+    Ask questions and discuss with the community
+  </Card>
+  <Card title="Documentation" icon="book" href="/introduction">
+    Browse comprehensive guides and API reference
+  </Card>
+  <Card title="FAQ" icon="circle-question" href="/support/faq">
+    Quick answers to common questions
+  </Card>
+</CardGroup>
+
+## Reporting Issues
+
+When reporting bugs or issues, help us help you by providing detailed information:
+
+### Before Creating an Issue
+
+<Steps>
+  <Step title="Search Existing Issues">
+    Check if your issue has already been reported or solved:
+    - [Search GitHub Issues](https://github.com/duixcom/Duix-Avatar/issues?q=is%3Aissue)
+    - Many issues are already documented with solutions
+    - Check closed issues too - your problem may be fixed in a newer version
+  </Step>
+
+  <Step title="Complete Self-Check Steps">
+    Verify the basics before reporting:
+    
+    1. **Confirm all three services are running:**
+       ```bash
+       docker ps
+       ```
+       You should see: `duix-avatar-tts`, `duix-avatar-asr`, `duix-avatar-gen-video`
+    
+    2. **Verify NVIDIA GPU is detected:**
+       ```bash
+       nvidia-smi
+       ```
+    
+    3. **Update to latest version:**
+       ```bash
+       # Server
+       cd deploy
+       docker-compose pull
+       docker-compose up -d
+       
+       # Client: Download from GitHub releases
+       ```
+    
+    See the [FAQ](/support/faq) for complete self-check instructions.
+  </Step>
+
+  <Step title="Collect Error Information">
+    Gather relevant logs and error messages:
+    
+    **Client Logs:**
+    - Open Duix Avatar app
+    - Navigate to Settings → View Logs
+    - Copy the latest log file
+    
+    **Server Logs:**
+    ```bash
+    # Save logs for each service
+    docker logs duix-avatar-tts > tts-logs.txt 2>&1
+    docker logs duix-avatar-asr > asr-logs.txt 2>&1
+    docker logs duix-avatar-gen-video > video-logs.txt 2>&1
+    ```
+    
+    **System Information:**
+    - Operating System (Windows 10/11, Ubuntu 22.04, etc.)
+    - GPU model (RTX 3090, RTX 4070, etc.)
+    - NVIDIA driver version (from `nvidia-smi`)
+    - Docker version (from `docker --version`)
+    - Client version (from Help → About)
+  </Step>
+</Steps>
+
+### Creating a Good Bug Report
+
+Use this template when creating a GitHub issue:
+
+```markdown
+## Description
+[Clear description of the problem]
+
+## Steps to Reproduce
+1. [First step]
+2. [Second step]
+3. [Third step]
+
+## Expected Behavior
+[What you expected to happen]
+
+## Actual Behavior
+[What actually happened]
+
+## Environment
+- OS: [Windows 11 / Ubuntu 22.04 / etc.]
+- GPU: [RTX 4070 / RTX 3090 / etc.]
+- NVIDIA Driver: [535.129.03 / etc.]
+- Docker Version: [24.0.6 / etc.]
+- Client Version: [1.0.6 / etc.]
+
+## Logs
+[Attach or paste relevant error logs]
+
+## Screenshots
+[If applicable, add screenshots to help explain the problem]
+
+## Additional Context
+[Any other information that might be helpful]
+```
+
+<Note>
+The more information you provide, the faster the community can help you solve the issue.
+</Note>
+
+## Feature Requests
+
+Have an idea to improve Duix Avatar? We welcome feature requests!
+
+<Steps>
+  <Step title="Check Existing Requests">
+    Search [GitHub Issues](https://github.com/duixcom/Duix-Avatar/issues?q=is%3Aissue+label%3Aenhancement) with the "enhancement" label to see if someone already suggested it.
+  </Step>
+
+  <Step title="Describe Your Use Case">
+    When creating a feature request, explain:
+    - What problem you're trying to solve
+    - Why existing features don't meet your needs
+    - How you envision the feature working
+    - Who would benefit from this feature
+  </Step>
+
+  <Step title="Be Open to Discussion">
+    The community may suggest alternative approaches or workarounds. Be open to feedback and collaboration.
+  </Step>
+</Steps>
+
+## Contributing
+
+Duix Avatar is open-source and welcomes contributions from the community!
+
+### Ways to Contribute
+
+<CardGroup cols={2}>
+  <Card title="Report Bugs" icon="bug">
+    Help identify and document issues
+  </Card>
+  <Card title="Improve Documentation" icon="file-pen">
+    Fix typos, clarify guides, add examples
+  </Card>
+  <Card title="Submit Code" icon="code">
+    Fix bugs or implement new features
+  </Card>
+  <Card title="Help Others" icon="hands-helping">
+    Answer questions in GitHub Discussions
+  </Card>
+</CardGroup>
+
+### Contributing Code
+
+<Steps>
+  <Step title="Fork the Repository">
+    Create your own fork of [Duix-Avatar](https://github.com/duixcom/Duix-Avatar)
+  </Step>
+
+  <Step title="Create a Branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    # or
+    git checkout -b fix/bug-description
+    ```
+  </Step>
+
+  <Step title="Make Your Changes">
+    - Follow existing code style
+    - Add tests if applicable
+    - Update documentation
+    - Test your changes thoroughly
+  </Step>
+
+  <Step title="Submit a Pull Request">
+    - Describe what your PR does
+    - Reference any related issues
+    - Explain your implementation approach
+    - Include screenshots for UI changes
+  </Step>
+</Steps>
+
+## Direct Contact
+
+### Email Support
+
+For general inquiries, business questions, or issues that require private communication:
+
+**Email:** james@duix.com
+
+<Warning>
+For technical issues and bug reports, please use [GitHub Issues](https://github.com/duixcom/Duix-Avatar/issues) instead of email. This allows the community to benefit from solutions and helps track known issues.
+</Warning>
+
+### Commercial Licensing
+
+For enterprises with:
+- More than 100,000 users, **or**
+- Annual revenue exceeding $10 million USD
+
+Please contact james@duix.com to discuss commercial licensing requirements.
+
+## Official Resources
+
+<CardGroup cols={2}>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/duixcom/Duix-Avatar">
+    Source code, releases, and issue tracking
+  </Card>
+  <Card title="Official Website" icon="globe" href="https://duix.com">
+    Company website and product information
+  </Card>
+  <Card title="Commercial API Docs" icon="book" href="https://docs.duix.com">
+    Documentation for enterprise API service
+  </Card>
+  <Card title="Online Demo" icon="play" href="https://duix.com">
+    Try Duix Avatar digital human interaction
+  </Card>
+</CardGroup>
+
+## Community Guidelines
+
+When participating in the Duix Avatar community:
+
+✅ **Do:**
+- Be respectful and constructive
+- Search before asking questions
+- Provide detailed information when reporting issues
+- Share your solutions to help others
+- Give credit where due
+
+❌ **Don't:**
+- Spam or post off-topic content
+- Demand immediate responses
+- Share others' private information
+- Use offensive or discriminatory language
+- Hijack existing threads for unrelated issues
+
+## Star History
+
+Show your support by starring the repository on GitHub! ⭐
+
+The project has grown from a small team's vision to a community of over 12,000 stars, empowering developers worldwide to create AI avatars.
+
+<Card title="View Star History" icon="star" href="https://www.star-history.com/#duixcom/Duix-Avatar&Date">
+  See how the Duix Avatar community has grown
+</Card>
+
+## Acknowledgments
+
+Duix Avatar is built on amazing open-source technologies:
+
+- **[FunASR](https://github.com/alibaba-damo-academy/FunASR)** - Automatic Speech Recognition
+- **[Fish Speech](https://github.com/fishaudio/fish-speech)** - Text-to-Speech engine
+- **Electron** - Cross-platform desktop framework
+- **Vue.js** - Progressive JavaScript framework
+- **Docker** - Containerization platform
+
+Thank you to all contributors and the open-source community! 🙏
+
+## Newsletter and Updates
+
+Stay informed about new releases and important updates:
+
+- **Watch the repository** on GitHub to get notifications
+- **Star the project** to bookmark it
+- Check the [Releases page](https://github.com/duixcom/Duix-Avatar/releases) for new versions
+- Follow [@duixcom](https://github.com/duixcom) on GitHub
+
+---
+
+<Note>
+This is a community-driven project. Response times may vary depending on volunteer availability. For enterprise support with guaranteed SLA, consider the [commercial API service](https://docs.duix.com).
+</Note>

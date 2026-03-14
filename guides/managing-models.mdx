@@ -1,0 +1,410 @@
+---
+title: Managing Models
+description: Organize and manage your avatar and video models in Duix Avatar
+---
+
+## Overview
+
+Duix Avatar provides comprehensive model management capabilities for both avatar models and synthesized videos. This guide covers CRUD operations, pagination, search, and storage organization.
+
+## Avatar Model Management
+
+### Listing Models
+
+Retrieve paginated avatar models with optional search:
+
+```javascript
+// From src/main/service/model.js:59
+function page({ page, pageSize, name = '' }) {
+  const total = count(name)
+  return {
+    total,
+    list: selectPage({ page, pageSize, name }).map((model) => ({
+      ...model,
+      video_path: path.join(assetPath.model, model.video_path),
+      audio_path: path.join(assetPath.ttsRoot, model.audio_path)
+    }))
+  }
+}
+```
+
+**Parameters:**
+- `page`: Page number (1-based)
+- `pageSize`: Number of items per page
+- `name`: Search filter (optional)
+
+**Returns:**
+- `total`: Total number of matching models
+- `list`: Array of model objects with full file paths
+
+<Tip>
+Use the `name` parameter to filter models by name for quick access to specific avatars.
+</Tip>
+
+### Finding a Specific Model
+
+Retrieve a single model by ID:
+
+```javascript
+// From src/main/service/model.js:71
+function findModel(modelId) {
+  const model = selectByID(modelId)
+  return {
+    ...model,
+    video_path: path.join(assetPath.model, model.video_path),
+    audio_path: path.join(assetPath.ttsRoot, model.audio_path)
+  }
+}
+```
+
+The function returns the complete model object with:
+- `id`: Unique model identifier
+- `modelName`: Display name
+- `video_path`: Full path to avatar video
+- `audio_path`: Full path to training audio
+- `voiceId`: Associated voice model ID
+
+### Counting Models
+
+Get the total number of models:
+
+```javascript
+// From src/main/service/model.js:99
+function countModel(name = '') {
+  return count(name)
+}
+```
+
+Supports optional name filter for counting search results.
+
+### Deleting Models
+
+Remove an avatar model and its associated files:
+
+```javascript
+// From src/main/service/model.js:80
+function removeModel(modelId) {
+  const model = selectByID(modelId)
+  
+  // Delete video file
+  const videoPath = path.join(assetPath.model, model.video_path ||'')
+  if (!isEmpty(model.video_path) && fs.existsSync(videoPath)) {
+    fs.unlinkSync(videoPath)
+  }
+
+  // Delete audio file
+  const audioPath = path.join(assetPath.ttsRoot, model.audio_path ||'')
+  if (!isEmpty(model.audio_path) && fs.existsSync(audioPath)) {
+    fs.unlinkSync(audioPath)
+  }
+
+  // Delete database record
+  deleteModel(modelId)
+}
+```
+
+<Warning>
+Deleting a model permanently removes:
+- Avatar video file
+- Training audio file
+- Database record
+
+This operation cannot be undone. Consider backing up important models before deletion.
+</Warning>
+
+## Video Management
+
+### Listing Videos
+
+Retrieve paginated synthesized videos with queue information:
+
+```javascript
+// From src/main/service/video.js:29
+function page({ page, pageSize, name = '' }) {
+  // Get waiting queue status
+  const waitingVideos = selectByStatus('waiting').map((v) => v.id)
+  const total = count(name)
+  const list = selectPage({ page, pageSize, name }).map((video) => {
+    video = {
+      ...video,
+      file_path: video.file_path ? 
+        path.join(assetPath.model, video.file_path) : 
+        video.file_path
+    }
+
+    if(video.status === 'waiting'){
+      video.progress = `${waitingVideos.indexOf(video.id) + 1} / ${waitingVideos.length}`
+    }
+    return video
+  })
+
+  return { total, list }
+}
+```
+
+**Features:**
+- Pagination support
+- Search by name
+- Queue position for waiting videos
+- Full file paths resolved
+
+<Note>
+Videos in "waiting" status display their queue position (e.g., "2 / 5" means 2nd in line).
+</Note>
+
+### Finding a Specific Video
+
+```javascript
+// From src/main/service/video.js:51
+function findVideo(videoId) {
+  const video = selectVideoByID(videoId)
+  return {
+    ...video,
+    file_path: video.file_path ? 
+      path.join(assetPath.model, video.file_path) : 
+      video.file_path
+  }
+}
+```
+
+### Saving Video Drafts
+
+Create or update video configurations:
+
+```javascript
+// From src/main/service/video.js:63
+function saveVideo({ id, model_id, name, text_content, voice_id, audio_path }) {
+  const video = selectVideoByID(id)
+  
+  if(audio_path){
+    audio_path = copyAudio4Video(audio_path)
+  }
+
+  if (video) {
+    // Update existing
+    return update({ id, model_id, name, text_content, voice_id, audio_path })
+  }
+  // Create new draft
+  return insertVideo({ 
+    model_id, 
+    name, 
+    status: 'draft', 
+    text_content, 
+    voice_id, 
+    audio_path 
+  })
+}
+```
+
+<Tip>
+Save video drafts to preserve your work before starting synthesis. Drafts can be edited and refined before queuing.
+</Tip>
+
+### Updating Videos
+
+Modify video properties:
+
+```javascript
+// From src/main/service/video.js:273
+function modify(video) {
+  return update(video)
+}
+```
+
+You can update any video properties including:
+- Name
+- Text content
+- Voice ID
+- Audio path
+- Model ID
+
+### Deleting Videos
+
+Remove videos and associated files:
+
+```javascript
+// From src/main/service/video.js:226
+function removeVideo(videoId) {
+  const video = selectVideoByID(videoId)
+  
+  // Delete video file
+  const videoPath = path.join(assetPath.model, video.file_path ||'')
+  if (!isEmpty(video.file_path) && fs.existsSync(videoPath)) {
+    fs.unlinkSync(videoPath)
+  }
+
+  // Delete audio file
+  const audioPath = path.join(assetPath.model, video.audio_path ||'')
+  if (!isEmpty(video.audio_path) && fs.existsSync(audioPath)) {
+    fs.unlinkSync(audioPath)
+  }
+
+  // Delete database record
+  return deleteVideo(videoId)
+}
+```
+
+<Warning>
+Deleting a video removes:
+- Synthesized video file (if completed)
+- Associated audio file
+- Database record and all metadata
+
+This cannot be undone.
+</Warning>
+
+### Counting Videos
+
+```javascript
+// From src/main/service/video.js:59
+function countVideo(name = '') {
+  return count(name)
+}
+```
+
+## Storage Organization
+
+Duix Avatar organizes files in a structured directory hierarchy:
+
+```
+assetPath/
+├── model/                      # Avatar videos and synthesized videos
+│   ├── YYYYMMDDHHmmssSSS.mp4  # Avatar video
+│   └── result_*.mp4            # Synthesized videos
+├── tts/
+│   ├── train/                  # Training audio files
+│   │   └── YYYYMMDDHHmmssSSS.wav
+│   └── product/                # Generated TTS audio
+│       └── uuid.wav
+```
+
+### Path Resolution
+
+The system stores relative paths in the database and resolves them to full paths when needed:
+
+```javascript
+// Database stores relative path
+const relativeModelPath = path.relative(assetPath.model, modelPath)
+
+// Retrieval resolves to full path
+video_path: path.join(assetPath.model, model.video_path)
+```
+
+<Note>
+This approach makes the system portable and allows moving asset directories without updating the database.
+</Note>
+
+## Search and Filtering
+
+Both model and video management support name-based search:
+
+```javascript
+// Search models
+const results = page({ page: 1, pageSize: 10, name: 'avatar' })
+
+// Search videos
+const videos = page({ page: 1, pageSize: 20, name: 'demo' })
+```
+
+The search filter applies to model/video names and returns matching items.
+
+## IPC Communication
+
+Model and video management functions are exposed via IPC for frontend access:
+
+### Model IPC Handlers
+
+```javascript
+// From src/main/service/model.js:103
+export function init() {
+  ipcMain.handle(MODEL_NAME + '/addModel', (event, ...args) => {
+    return addModel(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/page', (event, ...args) => {
+    return page(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/find', (event, ...args) => {
+    return findModel(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/count', (event, ...args) => {
+    return countModel(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/remove', (event, ...args) => {
+    return removeModel(...args)
+  })
+}
+```
+
+### Video IPC Handlers
+
+```javascript
+// From src/main/service/video.js:277
+export function init() {
+  ipcMain.handle(MODEL_NAME + '/page', (event, ...args) => {
+    return page(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/make', (event, ...args) => {
+    return makeVideo(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/modify', (event, ...args) => {
+    return modify(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/save', (event, ...args) => {
+    return saveVideo(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/find', (event, ...args) => {
+    return findVideo(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/count', (event, ...args) => {
+    return countVideo(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/export', (event, ...args) => {
+    return exportVideo(...args)
+  })
+  ipcMain.handle(MODEL_NAME + '/remove', (event, ...args) => {
+    return removeVideo(...args)
+  })
+}
+```
+
+## Best Practices
+
+### Organization
+
+<Tip>
+**Keep your models organized:**
+- Use descriptive names for avatars and videos
+- Implement a naming convention (e.g., "ProjectName_AvatarName")
+- Regularly review and delete unused models
+- Monitor storage usage
+</Tip>
+
+### Performance
+
+1. **Pagination**: Always use pagination for large model collections
+2. **Search**: Implement search for quick access to specific models
+3. **Indexing**: The database handles indexing automatically
+4. **Caching**: Consider caching frequently accessed models
+
+### Data Safety
+
+<Warning>
+**Protect your data:**
+- Backup important models before deletion
+- Test deletion operations in development first
+- Verify file paths before removing files
+- Implement soft deletes for critical models
+</Warning>
+
+### Maintenance
+
+1. **Regular Cleanup**: Remove failed or abandoned videos
+2. **Storage Monitoring**: Track disk usage of asset directories
+3. **Database Optimization**: Periodically vacuum the database
+4. **File Integrity**: Verify file existence matches database records
+
+## Next Steps
+
+- Learn about [Exporting Videos](/guides/exporting-videos) to share your creations
+- Explore [Video Synthesis](/guides/video-synthesis) to create new content
+- Review [Creating Avatars](/guides/creating-avatar) for adding new models

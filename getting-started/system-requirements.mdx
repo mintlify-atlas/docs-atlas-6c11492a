@@ -1,0 +1,183 @@
+---
+title: 'System Requirements'
+description: 'Hardware and software requirements for running Duix Avatar'
+---
+
+Duix Avatar supports Docker-based deployment on Windows and Ubuntu systems. Before installation, ensure your hardware and software environments meet the specified requirements.
+
+## Platform Support
+
+Duix Avatar supports two deployment modes:
+- Windows 10 (19042.1526 or higher)
+- Ubuntu 22.04 Desktop (other Linux distributions not tested)
+
+---
+
+## Windows Requirements
+
+### Operating System
+
+<Note>
+Currently supports **Windows 10 build 19042.1526 or higher**
+</Note>
+
+### Hardware Requirements
+
+<CardGroup cols={2}>
+  <Card title="Recommended Configuration" icon="server">
+    - **CPU**: 13th Gen Intel Core i5-13400F
+    - **Memory**: 32GB RAM
+    - **Graphics Card**: NVIDIA RTX 4070
+    - **D Drive**: 30GB+ free space (for digital human and project data)
+    - **C Drive**: 100GB+ free space (for Docker images)
+  </Card>
+  
+  <Card title="Minimum Requirements" icon="hard-drive">
+    - **D Drive**: Must exist with 30GB+ free space
+    - **C Drive**: 100GB+ free space
+    - **Graphics Card**: NVIDIA GPU (required)
+    - **Memory**: 32GB recommended
+  </Card>
+</CardGroup>
+
+<Warning>
+Duix Avatar **requires an NVIDIA graphics card** with properly installed drivers. All computing is performed locally and services will not start without an NVIDIA GPU.
+</Warning>
+
+### Storage Configuration
+
+| Drive | Purpose | Required Space | Notes |
+|-------|---------|----------------|-------|
+| **D Drive** | Digital human and project data storage | 30GB+ | Must exist |
+| **C Drive** | Docker service image files | 100GB+ | Can be changed in Docker settings if insufficient |
+
+<Note>
+If C Drive has less than 100GB available, you can configure Docker to use a different disk with sufficient space after installation.
+</Note>
+
+### Software Dependencies
+
+- **Node.js**: Version 18
+- **WSL** (Windows Subsystem for Linux): Required for Docker
+- **Docker Desktop for Windows**: Latest version
+- **NVIDIA Graphics Drivers**: Latest compatible drivers
+
+---
+
+## Ubuntu Requirements
+
+### Operating System
+
+<Note>
+Fully tested on **Ubuntu 22.04 Desktop** (kernel 6.8.0-52-generic). Other Linux distributions theoretically supported but not tested.
+</Note>
+
+### Hardware Requirements
+
+<CardGroup cols={2}>
+  <Card title="Recommended Configuration" icon="server">
+    - **CPU**: 13th Gen Intel Core i5-13400F
+    - **Memory**: 32GB RAM (necessary)
+    - **Graphics Card**: NVIDIA RTX 4070
+    - **Hard Disk**: 100GB+ free space
+  </Card>
+  
+  <Card title="GPU Requirements" icon="microchip">
+    - **NVIDIA Graphics Card**: Required
+    - **Drivers**: Properly installed NVIDIA drivers
+    - **Container Toolkit**: NVIDIA Container Toolkit
+  </Card>
+</CardGroup>
+
+<Warning>
+Ensure you have an **NVIDIA graphics card** with correctly installed drivers. Use `nvidia-smi` to verify installation.
+</Warning>
+
+### Software Dependencies
+
+- **Node.js**: Version 18
+- **Docker**: Latest version (docker.io)
+- **Docker Compose**: Latest version
+- **NVIDIA Container Toolkit**: Required for GPU support in Docker
+- **NVIDIA Graphics Drivers**: Latest compatible drivers
+
+---
+
+## Docker Images
+
+The following Docker images are required for deployment:
+
+```bash
+docker pull guiji2025/fun-asr
+docker pull guiji2025/fish-speech-ziming
+docker pull guiji2025/duix.avatar
+```
+
+<Note>
+These images will be automatically pulled when running `docker-compose up -d`. The download will consume approximately **70GB of bandwidth** and take around 30 minutes depending on your network speed.
+</Note>
+
+---
+
+## Network Requirements
+
+<Warning>
+**Important**: Initial Docker image download requires approximately **70GB of bandwidth**. Ensure you have:
+- Stable internet connection
+- WiFi or unlimited data plan
+- Sufficient time (approximately 30 minutes)
+</Warning>
+
+After installation, Duix Avatar operates **fully offline** with no internet connection required.
+
+---
+
+## Special GPU Support
+
+### NVIDIA 50 Series Graphics Cards
+
+For NVIDIA 50 series graphics cards (also tested on 30/40 series with CUDA 12.8):
+- Uses official preview version of PyTorch
+- Tested and verified on RTX 5090 GPU
+- Refer to the special deployment guide for installation
+
+---
+
+## Verification
+
+Before proceeding with installation, verify:
+
+<Steps>
+  <Step title="Check Operating System">
+    Ensure you're running Windows 10 (19042.1526+) or Ubuntu 22.04
+  </Step>
+  
+  <Step title="Verify NVIDIA GPU">
+    Confirm you have an NVIDIA graphics card installed
+  </Step>
+  
+  <Step title="Check Storage Space">
+    - **Windows**: D Drive (30GB+) and C Drive (100GB+)
+    - **Ubuntu**: 100GB+ free space
+  </Step>
+  
+  <Step title="Confirm RAM">
+    32GB RAM recommended for optimal performance
+  </Step>
+</Steps>
+
+---
+
+## Next Steps
+
+Once you've verified your system meets the requirements:
+
+<CardGroup cols={2}>
+  <Card title="Windows Installation" icon="windows" href="/getting-started/windows-installation">
+    Install Duix Avatar on Windows 10+
+  </Card>
+  
+  <Card title="Ubuntu Installation" icon="ubuntu" href="/getting-started/ubuntu-installation">
+    Install Duix Avatar on Ubuntu 22.04
+  </Card>
+</CardGroup>

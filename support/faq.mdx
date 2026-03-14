@@ -1,0 +1,371 @@
+---
+title: Frequently Asked Questions
+description: Common questions and answers about Duix Avatar
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is Duix Avatar and what can I do with it?">
+    Duix Avatar is a free and open-source AI avatar toolkit that allows you to create realistic digital humans from real-person video data. You can:
+    
+    - Clone your appearance and voice using AI algorithms
+    - Generate videos by driving virtual avatars through text or voice
+    - Create content in 8 different languages
+    - Operate completely offline for privacy protection
+    - Use it for education, content creation, marketing, and more
+    
+    The entire system runs locally on your computer with no internet connection required.
+  </Accordion>
+
+  <Accordion title="Do I need an internet connection to use Duix Avatar?">
+    No! Duix Avatar is designed for **fully offline operation**. Once you've downloaded the Docker images and installed the client application, everything runs locally on your computer. This ensures:
+    
+    - Complete privacy protection
+    - No data transmission to external servers
+    - Independence from network connectivity
+    - Full control over your data
+    
+    You only need internet for the initial download of Docker images (~70GB) and software updates.
+  </Accordion>
+
+  <Accordion title="What are the hardware requirements?">
+    **Minimum Requirements:**
+    - CPU: 13th Gen Intel Core i5-13400F or equivalent
+    - Memory: 32GB RAM (required)
+    - GPU: NVIDIA RTX 30 series or higher (RTX 4070 recommended)
+    - Storage: 100GB+ free space on C: drive (Windows) or root partition (Linux)
+    - Additional: 30GB+ free space on D: drive (Windows) for data storage
+    
+    **NVIDIA GPU is mandatory** - the AI models require GPU acceleration and won't run on CPU-only systems. See [System Requirements](/getting-started/system-requirements) for detailed specifications.
+  </Accordion>
+
+  <Accordion title="Which operating systems are supported?">
+    Duix Avatar officially supports:
+    
+    - **Windows 10** (build 19042.1526 or higher) and **Windows 11**
+    - **Ubuntu 22.04 Desktop** (kernel 6.8.0-52-generic or later)
+    
+    Other Linux distributions may work but haven't been officially tested. macOS is not currently supported due to NVIDIA GPU requirements.
+  </Accordion>
+
+  <Accordion title="Is Duix Avatar free to use commercially?">
+    Yes! Duix Avatar is open-source and supports **global free commercial use** with the following terms:
+    
+    - ✅ Free for most users and organizations
+    - ✅ Full source code available on GitHub
+    - ✅ Modify and extend to fit your needs
+    - ⚠️ Enterprises with **more than 100,000 users** or **annual revenue exceeding $10 million USD** need to sign a commercial license agreement
+    
+    See the [LICENSE](https://github.com/duixcom/Duix-Avatar/blob/main/LICENSE) file for complete terms.
+  </Accordion>
+</AccordionGroup>
+
+## Installation & Setup
+
+<AccordionGroup>
+  <Accordion title="How do I check if Docker services are running correctly?">
+    **Self-Check Steps:**
+    
+    1. **Open Docker Desktop** (Windows) or run `docker ps` (Linux)
+    2. **Verify three services are running:**
+       - `duix-avatar-tts` (port 18180)
+       - `duix-avatar-asr` (port 10095)
+       - `duix-avatar-gen-video` (port 8383)
+    3. **All services should show "Running" status**
+    
+    If any service is not running or shows errors, check the [Troubleshooting Guide](/deployment/troubleshooting).
+  </Accordion>
+
+  <Accordion title="Do I need to install NVIDIA drivers separately?">
+    Yes, you must install NVIDIA drivers before deploying Duix Avatar:
+    
+    **Windows:**
+    - Download drivers from [nvidia.com/drivers](https://www.nvidia.cn/drivers/lookup/)
+    - Install and restart your computer
+    - Verify with `nvidia-smi` in PowerShell
+    
+    **Ubuntu:**
+    ```bash
+    # Install NVIDIA driver
+    sudo ubuntu-drivers autoinstall
+    
+    # Verify installation
+    nvidia-smi
+    ```
+    
+    See the [NVIDIA GPU Setup](/deployment/nvidia-gpu-setup) guide for detailed instructions.
+  </Accordion>
+
+  <Accordion title="Why is my download so slow when pulling Docker images?">
+    The three Docker images total approximately **70GB**, which can take time to download depending on your network speed:
+    
+    - `guiji2025/fun-asr` - ASR service
+    - `guiji2025/fish-speech-ziming` - TTS service  
+    - `guiji2025/duix.avatar` - Video generation service
+    
+    **Tips to speed up download:**
+    - Use a wired ethernet connection instead of WiFi
+    - Download during off-peak hours
+    - Consider using Docker registry mirrors in your region
+    - Be patient - this is a one-time download
+  </Accordion>
+
+  <Accordion title="Can I use the lite version if I have limited resources?">
+    Yes! The lite version (`docker-compose-lite.yml`) runs only the essential video generation service:
+    
+    ```bash
+    # Windows
+    cd deploy
+    docker-compose -f docker-compose-lite.yml up -d
+    
+    # Ubuntu
+    cd deploy
+    docker-compose -f docker-compose-lite.yml up -d
+    ```
+    
+    **Limitations of lite version:**
+    - No voice cloning (you must provide pre-recorded audio)
+    - No automatic speech recognition
+    - Only video generation is available
+    
+    Use the lite version if you plan to use custom audio files instead of text-to-speech.
+  </Accordion>
+</AccordionGroup>
+
+## Usage & Features
+
+<AccordionGroup>
+  <Accordion title="What languages are supported for text-to-speech?">
+    Duix Avatar supports **8 languages** for both script input and voice cloning:
+    
+    | Language | Code | Native Name |
+    |----------|------|-------------|
+    | Chinese | `zh` | 中文 |
+    | English | `en` | English |
+    | Japanese | `ja` | 日本語 |
+    | Korean | `ko` | 한국어 |
+    | German | `de` | Deutsch |
+    | French | `fr` | Français |
+    | Spanish | `es` | Español |
+    | Arabic | `ar` | العربية |
+    
+    The language is automatically detected from your training video, or you can specify it manually during model creation.
+  </Accordion>
+
+  <Accordion title="How long does it take to create an avatar?">
+    The avatar creation process has several stages with varying durations:
+    
+    **Model Training:** 5-15 minutes
+    - Video upload and conversion
+    - Audio extraction
+    - Voice model training
+    
+    **Video Generation:** 1-5 minutes per video
+    - Depends on video length and GPU
+    - Typical 1-minute video: ~2 minutes on RTX 4070
+    - Queued videos process sequentially
+    
+    **Factors affecting speed:**
+    - GPU model (RTX 5090 > RTX 4090 > RTX 4070 > RTX 3090)
+    - Video resolution and length
+    - Number of queued tasks
+    - System resources available
+  </Accordion>
+
+  <Accordion title="Can I create multiple avatars?">
+    Yes! Duix Avatar supports managing multiple avatar models:
+    
+    - Create unlimited avatars from different source videos
+    - Each avatar has its own cloned voice and appearance
+    - Switch between avatars when creating videos
+    - Models are stored in your data directory
+    - Delete models you no longer need to free up space
+    
+    See the [Managing Models](/guides/managing-models) guide for details.
+  </Accordion>
+
+  <Accordion title="What video quality can I expect?">
+    Video quality depends on several factors:
+    
+    **Source Video Quality:**
+    - Use high-resolution source videos (1080p recommended)
+    - Good lighting and clear facial features
+    - Stable camera position
+    - Minimal background noise for voice cloning
+    
+    **Output Quality:**
+    - Videos are generated in H.264 format
+    - Resolution matches source video
+    - Natural lip-syncing with 95%+ accuracy
+    - Smooth facial movements and expressions
+    
+    **Comparison:**
+    - **Open-source version:** Usable quality for most applications
+    - **Commercial API:** Stunning quality with enhanced lip-sync
+    
+    For production use cases requiring the highest quality, consider the [commercial API service](https://docs.duix.com).
+  </Accordion>
+
+  <Accordion title="Can I use my own audio files instead of text-to-speech?">
+    Yes! You can upload custom audio files during video creation:
+    
+    1. Prepare your audio file (WAV or MP3 format)
+    2. In the video editor, choose "Upload Audio" instead of entering text
+    3. Select your audio file
+    4. Generate the video
+    
+    This is useful when you:
+    - Have pre-recorded professional voiceovers
+    - Want to use audio from other TTS services
+    - Need precise timing or specific audio effects
+    - Are using the lite version without TTS service
+    
+    See [Video Synthesis](/guides/video-synthesis) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="What should I do before asking for help?">
+    **Complete these self-check steps first:**
+    
+    1. **Verify all three services are running**
+       - Open Docker Desktop or run `docker ps`
+       - All three containers should show "Running" status
+    
+    2. **Confirm NVIDIA GPU is detected**
+       - Run `nvidia-smi` in terminal
+       - Should display your GPU model and driver version
+    
+    3. **Update to latest version**
+       - Server: `cd deploy && docker-compose pull && docker-compose up -d`
+       - Client: Download latest release from GitHub
+    
+    4. **Check GitHub Issues**
+       - Search [existing issues](https://github.com/duixcom/Duix-Avatar/issues)
+       - Your problem might already be solved
+    
+    See the [Common Issues](/support/common-issues) page for specific problems and solutions.
+  </Accordion>
+
+  <Accordion title="How do I collect error logs for bug reports?">
+    **Client Logs:**
+    - Open Duix Avatar application
+    - Click the settings/menu icon
+    - Select "View Logs" or "Open Log Folder"
+    - Copy the latest log file
+    
+    **Server Logs:**
+    ```bash
+    # View logs for specific service
+    docker logs duix-avatar-tts
+    docker logs duix-avatar-asr
+    docker logs duix-avatar-gen-video
+    
+    # Save logs to file
+    docker logs duix-avatar-gen-video > video-service.log 2>&1
+    ```
+    
+    When reporting issues, include:
+    - Error message or description
+    - Steps to reproduce
+    - Client and server logs
+    - System information (OS, GPU model, driver version)
+  </Accordion>
+
+  <Accordion title="Why does my video generation fail or get stuck?">
+    Common causes and solutions:
+    
+    **GPU Out of Memory:**
+    - Close other GPU-intensive applications
+    - Reduce video resolution
+    - Restart Docker services
+    - Check available GPU memory with `nvidia-smi`
+    
+    **Service Not Running:**
+    - Verify `duix-avatar-gen-video` is running
+    - Check service logs: `docker logs duix-avatar-gen-video`
+    - Restart service: `docker restart duix-avatar-gen-video`
+    
+    **Corrupted Video/Audio:**
+    - Ensure source video is valid H.264
+    - Check audio file format (WAV recommended)
+    - Re-upload source materials
+    
+    **Queue Issues:**
+    - Check if other videos are processing
+    - Wait for current task to complete
+    - Videos process one at a time
+    
+    See [Troubleshooting](/deployment/troubleshooting) for detailed debugging steps.
+  </Accordion>
+</AccordionGroup>
+
+## API & Development
+
+<AccordionGroup>
+  <Accordion title="Can I integrate Duix Avatar into my own application?">
+    Yes! Duix Avatar provides open APIs for integration:
+    
+    **Available APIs:**
+    - **Model Training**: `POST http://127.0.0.1:18180/v1/preprocess_and_tran`
+    - **Audio Synthesis**: `POST http://127.0.0.1:18180/v1/invoke`
+    - **Video Synthesis**: `POST http://127.0.0.1:8383/easy/submit`
+    - **Progress Query**: `GET http://127.0.0.1:8383/easy/query`
+    
+    See the [API Reference](/api/introduction) for complete documentation with code examples.
+  </Accordion>
+
+  <Accordion title="What's the difference between open-source and commercial API?">
+    **Open-Source (Duix Avatar):**
+    - ✅ Free and open-source
+    - ✅ 100% offline operation
+    - ✅ Full code access and customization
+    - ✅ Community support
+    - ⚠️ Self-managed hardware and maintenance
+    - ⚠️ Good quality but not production-grade
+    - ⚠️ Slower iteration and updates
+    
+    **Commercial API (duix.com):**
+    - ✅ Stunning, production-grade quality
+    - ✅ Latest models and algorithms
+    - ✅ Enterprise SLA guarantees
+    - ✅ No hardware required
+    - ✅ Professional support team
+    - ✅ Faster updates and bug fixes
+    - 💰 Paid service
+    
+    Choose open-source for:
+    - Privacy-sensitive applications
+    - Learning and experimentation
+    - Full control over infrastructure
+    - Budget constraints
+    
+    Choose commercial API for:
+    - Production deployments
+    - High-quality requirements
+    - Enterprise use cases
+    - Faster time-to-market
+    
+    Learn more at [duix.com](https://duix.com) and [API docs](https://docs.duix.com).
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Common Issues" icon="wrench" href="/support/common-issues">
+    Browse solutions to frequent problems
+  </Card>
+  <Card title="Contact Support" icon="envelope" href="/support/contact">
+    Get help from the community or team
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/duixcom/Duix-Avatar/issues">
+    Search existing issues or report bugs
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/introduction">
+    Technical API documentation
+  </Card>
+</CardGroup>

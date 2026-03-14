@@ -1,0 +1,298 @@
+---
+title: 'Windows Installation'
+description: 'Complete guide to installing Duix Avatar on Windows 10+'
+---
+
+This guide walks you through installing Duix Avatar on Windows 10 (build 19042.1526 or higher) using Docker.
+
+<Warning>
+Before proceeding, ensure your system meets all [system requirements](/getting-started/system-requirements), including:
+- Windows 10 build 19042.1526 or higher
+- NVIDIA graphics card with installed drivers
+- D Drive with 30GB+ free space
+- C Drive with 100GB+ free space
+</Warning>
+
+---
+
+## Prerequisites
+
+### Install NVIDIA Drivers
+
+<Steps>
+  <Step title="Check Current Drivers">
+    Verify if NVIDIA drivers are installed on your system. You can check in Device Manager or NVIDIA Control Panel.
+  </Step>
+  
+  <Step title="Download Latest Drivers">
+    Download the latest NVIDIA drivers from the official website:
+    
+    [NVIDIA Driver Downloads](https://www.nvidia.cn/drivers/lookup/)
+    
+    Select your graphics card model and operating system to download the appropriate driver.
+  </Step>
+  
+  <Step title="Install Drivers">
+    Run the downloaded installer and follow the installation wizard. Restart your computer after installation.
+  </Step>
+</Steps>
+
+---
+
+## Install Docker Desktop
+
+### Step 1: Check WSL Installation
+
+Docker Desktop for Windows requires Windows Subsystem for Linux (WSL).
+
+<Steps>
+  <Step title="Check WSL Status">
+    Open PowerShell or Command Prompt and run:
+    
+    ```bash
+    wsl --list --verbose
+    ```
+    
+    If WSL is already installed, you'll see a list of installed distributions. If not, Windows will prompt you to install it.
+  </Step>
+  
+  <Step title="Update WSL">
+    Update WSL to the latest version:
+    
+    ```bash
+    wsl --update
+    ```
+    
+    Wait for the update to complete.
+  </Step>
+</Steps>
+
+### Step 2: Download and Install Docker
+
+<Steps>
+  <Step title="Download Docker Desktop">
+    Visit [Docker's official website](https://www.docker.com/) and download Docker Desktop for Windows.
+    
+    Choose the installation package based on your CPU architecture (Intel/AMD or ARM).
+  </Step>
+  
+  <Step title="Run the Installer">
+    Double-click the downloaded installer and follow the installation wizard.
+    
+    When you see the successful installation interface, Docker is ready.
+  </Step>
+  
+  <Step title="Launch Docker Desktop">
+    Start Docker Desktop from the Start menu or desktop shortcut.
+  </Step>
+  
+  <Step title="Accept Agreement and Skip Login">
+    On first run:
+    1. Accept the Docker Subscription Service Agreement
+    2. Skip the login when prompted (you can use Docker without an account)
+  </Step>
+</Steps>
+
+<Note>
+If your C Drive has less than 100GB available, configure Docker to use a different disk:
+1. Open Docker Desktop Settings
+2. Navigate to Resources → Advanced
+3. Change the disk image location to a drive with sufficient space
+</Note>
+
+---
+
+## Install Duix Avatar Server
+
+### Step 1: Navigate to Deploy Directory
+
+Open PowerShell or Command Prompt and navigate to the `deploy` directory in your Duix Avatar installation:
+
+```bash
+cd path/to/Duix.Avatar/deploy
+```
+
+### Step 2: Deploy Services
+
+<Note>
+This step will download approximately **70GB** of Docker images. Ensure you have:
+- Stable internet connection (WiFi recommended)
+- Sufficient time (approximately 30 minutes)
+- Patience - the download speed depends on your network
+</Note>
+
+<Tabs>
+  <Tab title="Full Version">
+    Deploy all three services (ASR, TTS, and Video Generation):
+    
+    ```bash
+    docker-compose up -d
+    ```
+    
+    This will start:
+    - **duix-avatar-asr**: Automatic Speech Recognition service (port 10095)
+    - **duix-avatar-tts**: Text-to-Speech service (port 18180)
+    - **duix-avatar-gen-video**: Video generation service (port 8383)
+  </Tab>
+  
+  <Tab title="Lite Version">
+    Deploy only the video generation service:
+    
+    ```bash
+    docker-compose -f docker-compose-lite.yml up -d
+    ```
+    
+    This starts only:
+    - **duix-avatar-gen-video**: Video generation service (port 8383)
+  </Tab>
+</Tabs>
+
+### Step 3: Verify Installation
+
+<Steps>
+  <Step title="Open Docker Desktop">
+    Launch Docker Desktop and check the Containers section.
+  </Step>
+  
+  <Step title="Verify Running Services">
+    You should see three services running (or one service for lite version):
+    
+    **Full Version:**
+    - `duix-avatar-asr`
+    - `duix-avatar-tts`
+    - `duix-avatar-gen-video`
+    
+    **Lite Version:**
+    - `duix-avatar-gen-video`
+    
+    All services should show a "Running" status.
+  </Step>
+</Steps>
+
+<Warning>
+**All three services must be in "Running" status** for Duix Avatar to work properly. If any service fails to start:
+1. Check that NVIDIA drivers are properly installed
+2. Verify that Docker has access to your GPU
+3. Check the service logs in Docker Desktop for error messages
+</Warning>
+
+---
+
+## Install Duix Avatar Client
+
+<Steps>
+  <Step title="Download Client">
+    Download the latest Windows client from the official releases:
+    
+    [Duix Avatar Releases](https://github.com/duixcom/Duix.Avatar/releases)
+    
+    Look for the file named `Duix.Avatar-x.x.x-setup.exe`
+  </Step>
+  
+  <Step title="Run Installer">
+    Double-click `Duix.Avatar-x.x.x-setup.exe` to start the installation wizard.
+    
+    Follow the prompts to complete the installation.
+  </Step>
+  
+  <Step title="Launch Application">
+    Once installed, launch Duix Avatar from the Start menu or desktop shortcut.
+  </Step>
+</Steps>
+
+---
+
+## Docker Compose Configuration
+
+The `docker-compose.yml` file configures three services:
+
+```yaml docker-compose.yml
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    ports:
+      - '18180:8080'
+    volumes:
+      - d:/duix_avatar_data/voice/data:/code/data
+
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    ports:
+      - '10095:10095'
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    ports:
+      - '8383:8383'
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+```
+
+### Data Storage Locations
+
+| Service | Volume Path | Purpose |
+|---------|-------------|----------|
+| TTS | `D:/duix_avatar_data/voice/data` | Voice training data |
+| Video Gen | `D:/duix_avatar_data/face2face` | Avatar models and videos |
+
+---
+
+## Troubleshooting
+
+### Services Won't Start
+
+<AccordionGroup>
+  <Accordion title="Check NVIDIA GPU and Drivers">
+    Ensure your NVIDIA graphics card and drivers are properly installed. All computing is performed locally and requires an NVIDIA GPU.
+    
+    Download drivers from: [https://www.nvidia.cn/drivers/lookup/](https://www.nvidia.cn/drivers/lookup/)
+  </Accordion>
+  
+  <Accordion title="Verify Docker GPU Access">
+    Docker Desktop must have access to your NVIDIA GPU. Check Docker settings under Resources → WSL Integration.
+  </Accordion>
+  
+  <Accordion title="Check Service Logs">
+    In Docker Desktop:
+    1. Click on the failing service
+    2. View the logs tab
+    3. Look for error messages
+    4. Copy logs if you need to report an issue
+  </Accordion>
+  
+  <Accordion title="Update to Latest Version">
+    The project is actively maintained with frequent updates. Ensure both server and client are up to date:
+    
+    **Server:**
+    ```bash
+    cd deploy
+    docker-compose down
+    docker-compose pull
+    docker-compose up -d
+    ```
+    
+    **Client:** Download the latest release from GitHub
+  </Accordion>
+</AccordionGroup>
+
+### Insufficient Disk Space
+
+<Steps>
+  <Step title="Check Available Space">
+    Ensure D Drive has 30GB+ and C Drive has 100GB+ available.
+  </Step>
+  
+  <Step title="Change Docker Image Location">
+    If C Drive is insufficient, change Docker's image location in Settings → Resources → Advanced.
+  </Step>
+</Steps>
+
+---
+
+## Next Steps
+
+Now that Duix Avatar is installed, you're ready to create your first avatar!
+
+<Card title="Quick Start Guide" icon="rocket" href="/getting-started/quickstart">
+  Learn how to create your first avatar and generate videos
+</Card>

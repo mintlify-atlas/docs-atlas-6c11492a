@@ -1,0 +1,163 @@
+---
+title: Creating an Avatar
+description: Learn how to create and clone digital avatars in Duix Avatar
+---
+
+## Overview
+
+Creating an avatar in Duix Avatar involves uploading a video, extracting audio, and training a voice model. The system automatically processes your video to create a digital clone that can speak in any language with your voice.
+
+## Requirements
+
+<Note>
+**Video Requirements:**
+- Format: MP4, AVI, MOV, or other common video formats
+- Quality: Higher quality videos produce better results
+- Duration: Minimum 10 seconds recommended for voice training
+- Content: Clear face visibility and audio quality
+</Note>
+
+## Creating Your First Avatar
+
+<Steps>
+  <Step title="Prepare Your Video">
+    Choose a high-quality video that meets the requirements. Ensure:
+    - Good lighting and clear face visibility
+    - Clear audio without background noise
+    - Natural speaking pace
+  </Step>
+
+  <Step title="Upload Video">
+    The `addModel` function handles the entire avatar creation process:
+
+    ```javascript
+    // From src/main/service/model.js:19
+    async function addModel(modelName, videoPath) {
+      // Create model directory if it doesn't exist
+      if (!fs.existsSync(assetPath.model)) {
+        fs.mkdirSync(assetPath.model, {
+          recursive: true
+        })
+      }
+      
+      // Convert video to H.264 format
+      const extname = path.extname(videoPath)
+      const modelFileName = dayjs().format('YYYYMMDDHHmmssSSS') + extname
+      const modelPath = path.join(assetPath.model, modelFileName)
+      await toH264(videoPath, modelPath)
+      
+      // Extract audio from video
+      const audioPath = path.join(assetPath.ttsTrain, modelFileName.replace(extname, '.wav'))
+      await extractAudio(modelPath, audioPath)
+      
+      // Train voice model
+      const voiceId = await trainVoice(relativeAudioPath, 'zh')
+      
+      // Save model to database
+      const id = insert({ modelName, videoPath: relativeModelPath, audioPath: relativeAudioPath, voiceId })
+      return id
+    }
+    ```
+  </Step>
+
+  <Step title="Video Conversion">
+    The system automatically converts your video to H.264 format for compatibility:
+    
+    ```javascript
+    await toH264(videoPath, modelPath)
+    ```
+    
+    This ensures optimal playback and processing across all platforms.
+  </Step>
+
+  <Step title="Audio Extraction">
+    Audio is extracted from the video using FFmpeg:
+    
+    ```javascript
+    // Extract to WAV format for voice training
+    const audioPath = path.join(assetPath.ttsTrain, modelFileName.replace(extname, '.wav'))
+    await extractAudio(modelPath, audioPath)
+    ```
+    
+    <Tip>
+    The extracted audio is automatically saved as WAV format, which provides the best quality for voice training.
+    </Tip>
+  </Step>
+
+  <Step title="Voice Training">
+    The extracted audio is sent for voice model training (see [Voice Cloning](/guides/voice-cloning) for details):
+    
+    ```javascript
+    const relativeAudioPath = path.relative(assetPath.ttsRoot, audioPath)
+    const voiceId = await trainVoice(relativeAudioPath, 'zh')
+    ```
+    
+    The system returns a unique voice ID that will be used for video synthesis.
+  </Step>
+
+  <Step title="Save Model Information">
+    Finally, the avatar model is saved to the database:
+    
+    ```javascript
+    const id = insert({ 
+      modelName, 
+      videoPath: relativeModelPath, 
+      audioPath: relativeAudioPath, 
+      voiceId 
+    })
+    ```
+    
+    Your avatar is now ready to use!
+  </Step>
+</Steps>
+
+## File Organization
+
+The system organizes avatar files in the following structure:
+
+```
+assetPath/
+├── model/               # Processed video files
+│   └── YYYYMMDDHHmmssSSS.mp4
+└── tts/
+    └── train/          # Extracted audio files
+        └── YYYYMMDDHHmmssSSS.wav
+```
+
+<Note>
+File names are generated using timestamps to ensure uniqueness: `dayjs().format('YYYYMMDDHHmmssSSS')`
+</Note>
+
+## Supported Languages
+
+Duix Avatar supports 8 languages for voice training:
+- Chinese (zh)
+- English (en)
+- Japanese (ja)
+- Korean (ko)
+- German (de)
+- French (fr)
+- Spanish (es)
+- Italian (it)
+
+<Tip>
+For best results, specify the language that matches the audio in your video during the training process.
+</Tip>
+
+## Best Practices
+
+1. **Video Quality**: Use 1080p or higher resolution videos
+2. **Audio Clarity**: Minimize background noise and ensure clear speech
+3. **Duration**: Longer videos (30+ seconds) provide better voice training data
+4. **Naming**: Use descriptive names for your avatars to easily identify them later
+5. **Storage**: Keep original videos backed up separately as the system stores processed versions
+
+<Warning>
+The video conversion and voice training process can take several minutes depending on video length and quality. Do not close the application during this process.
+</Warning>
+
+## Next Steps
+
+- Learn about [Voice Cloning](/guides/voice-cloning) to understand the voice training process
+- Explore [Video Synthesis](/guides/video-synthesis) to create videos with your avatar
+- Manage your avatars with [Managing Models](/guides/managing-models)

@@ -1,0 +1,388 @@
+---
+title: 'Ubuntu Installation'
+description: 'Complete guide to installing Duix Avatar on Ubuntu 22.04'
+---
+
+This guide walks you through installing Duix Avatar on Ubuntu 22.04 Desktop using Docker.
+
+<Warning>
+Before proceeding, ensure your system meets all [system requirements](/getting-started/system-requirements), including:
+- Ubuntu 22.04 Desktop (kernel 6.8.0-52-generic recommended)
+- NVIDIA graphics card with installed drivers
+- 100GB+ free disk space
+- 32GB RAM (necessary)
+</Warning>
+
+<Note>
+Duix Avatar has been fully tested on **Ubuntu 22.04 Desktop**. Other Linux distributions are theoretically supported but have not been tested.
+</Note>
+
+---
+
+## Install Docker
+
+### Step 1: Check Docker Installation
+
+First, verify if Docker is already installed:
+
+```bash
+docker --version
+```
+
+If Docker is installed, you'll see the version number. If not, proceed with installation.
+
+### Step 2: Install Docker and Docker Compose
+
+<Steps>
+  <Step title="Update Package Index">
+    ```bash
+    sudo apt update
+    ```
+  </Step>
+  
+  <Step title="Install Docker">
+    ```bash
+    sudo apt install docker.io
+    ```
+  </Step>
+  
+  <Step title="Install Docker Compose">
+    ```bash
+    sudo apt install docker-compose
+    ```
+  </Step>
+  
+  <Step title="Verify Installation">
+    Check that Docker is installed correctly:
+    
+    ```bash
+    docker --version
+    docker-compose --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Install NVIDIA Graphics Driver
+
+<Warning>
+**NVIDIA GPU Required**: Duix Avatar requires an NVIDIA graphics card for local computing. Services will not start without proper GPU support.
+</Warning>
+
+### Step 1: Install NVIDIA Drivers
+
+<Steps>
+  <Step title="Download Drivers">
+    Refer to the official NVIDIA documentation to download and install the appropriate driver for your graphics card:
+    
+    [NVIDIA Driver Downloads](https://www.nvidia.cn/drivers/lookup/)
+    
+    Select your GPU model and Linux as the operating system.
+  </Step>
+  
+  <Step title="Install the Driver">
+    Follow NVIDIA's installation instructions for your downloaded driver package.
+  </Step>
+  
+  <Step title="Verify Installation">
+    After installation, verify the driver is working:
+    
+    ```bash
+    nvidia-smi
+    ```
+    
+    If successful, you'll see information about your GPU including driver version, CUDA version, and GPU utilization.
+  </Step>
+</Steps>
+
+<Note>
+If `nvidia-smi` displays your graphics card information, the NVIDIA driver is successfully installed.
+</Note>
+
+---
+
+## Install NVIDIA Container Toolkit
+
+The NVIDIA Container Toolkit is essential for Docker to access NVIDIA GPUs.
+
+<Steps>
+  <Step title="Add NVIDIA Package Repository">
+    ```bash
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+      && curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add - \
+      && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    ```
+  </Step>
+  
+  <Step title="Update Package List">
+    ```bash
+    sudo apt-get update
+    ```
+  </Step>
+  
+  <Step title="Install NVIDIA Container Toolkit">
+    ```bash
+    sudo apt-get install -y nvidia-container-toolkit
+    ```
+  </Step>
+  
+  <Step title="Configure Docker Runtime">
+    Configure Docker to use the NVIDIA runtime:
+    
+    ```bash
+    sudo nvidia-ctk runtime configure --runtime=docker
+    ```
+  </Step>
+  
+  <Step title="Restart Docker Service">
+    Apply the changes by restarting Docker:
+    
+    ```bash
+    sudo systemctl restart docker
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Install Duix Avatar Server
+
+### Step 1: Navigate to Deploy Directory
+
+Navigate to the `deploy` directory in your Duix Avatar installation:
+
+```bash
+cd /path/to/Duix.Avatar/deploy
+```
+
+### Step 2: Deploy Services
+
+<Note>
+This step will download approximately **70GB** of Docker images. Ensure you have:
+- Stable internet connection
+- Sufficient time (approximately 30 minutes)
+- The download speed depends on your network
+</Note>
+
+Deploy the services using Docker Compose:
+
+```bash
+docker-compose -f docker-compose-linux.yml up -d
+```
+
+This command will:
+1. Pull the required Docker images (if not already present)
+2. Start three services:
+   - **duix-avatar-asr**: Automatic Speech Recognition (port 10095)
+   - **duix-avatar-tts**: Text-to-Speech (port 18180)
+   - **duix-avatar-gen-video**: Video generation (port 8383)
+
+### Step 3: Verify Installation
+
+<Steps>
+  <Step title="Check Running Containers">
+    Verify all services are running:
+    
+    ```bash
+    sudo docker ps
+    ```
+    
+    You should see three containers:
+    - `duix-avatar-asr`
+    - `duix-avatar-tts`
+    - `duix-avatar-gen-video`
+  </Step>
+  
+  <Step title="Check Service Status">
+    All containers should show "Up" status. If any container has exited, check the logs:
+    
+    ```bash
+    sudo docker logs <container-name>
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+**All three services must be running** for Duix Avatar to function properly. If any service fails:
+1. Verify NVIDIA drivers are installed (`nvidia-smi`)
+2. Ensure NVIDIA Container Toolkit is configured
+3. Check container logs for error messages
+</Warning>
+
+---
+
+## Install Duix Avatar Client
+
+<Steps>
+  <Step title="Download Client">
+    Download the latest Linux client from the official releases:
+    
+    [Duix Avatar Releases](https://github.com/duixcom/Duix.Avatar/releases)
+    
+    Look for the file named `Duix.Avatar-x.x.x.AppImage`
+  </Step>
+  
+  <Step title="Make Executable">
+    Make the AppImage executable:
+    
+    ```bash
+    chmod +x Duix.Avatar-x.x.x.AppImage
+    ```
+  </Step>
+  
+  <Step title="Launch Application">
+    Double-click the AppImage file to launch Duix Avatar, or run from terminal:
+    
+    ```bash
+    ./Duix.Avatar-x.x.x.AppImage
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+**Root User Notice**: If you're logged in as the `root` user, double-clicking may not work. Instead, run:
+
+```bash
+./Duix.Avatar-x.x.x.AppImage --no-sandbox
+```
+
+The `--no-sandbox` parameter is required when running as root.
+</Warning>
+
+---
+
+## Docker Compose Configuration
+
+The `docker-compose-linux.yml` file configures three services:
+
+```yaml docker-compose-linux.yml
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    ports:
+      - '18180:8080'
+    volumes:
+      - ~/duix_avatar_data/voice/data:/code/data
+
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    ports:
+      - '10095:10095'
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    ports:
+      - '8383:8383'
+    volumes:
+      - ~/duix_avatar_data/face2face:/code/data
+```
+
+### Data Storage Locations
+
+| Service | Volume Path | Purpose |
+|---------|-------------|----------|
+| TTS | `~/duix_avatar_data/voice/data` | Voice training data |
+| Video Gen | `~/duix_avatar_data/face2face` | Avatar models and videos |
+
+<Note>
+Data is stored in your home directory under `~/duix_avatar_data/`
+</Note>
+
+---
+
+## Troubleshooting
+
+### Services Won't Start
+
+<AccordionGroup>
+  <Accordion title="Check NVIDIA GPU and Drivers">
+    Verify your NVIDIA drivers are working:
+    
+    ```bash
+    nvidia-smi
+    ```
+    
+    If this command fails, reinstall the NVIDIA drivers.
+  </Accordion>
+  
+  <Accordion title="Verify NVIDIA Container Toolkit">
+    Test that Docker can access the GPU:
+    
+    ```bash
+    sudo docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+    ```
+    
+    If this fails, reinstall the NVIDIA Container Toolkit.
+  </Accordion>
+  
+  <Accordion title="Check Container Logs">
+    View logs for a specific container:
+    
+    ```bash
+    sudo docker logs duix-avatar-gen-video
+    sudo docker logs duix-avatar-tts
+    sudo docker logs duix-avatar-asr
+    ```
+  </Accordion>
+  
+  <Accordion title="Update to Latest Version">
+    Pull the latest images and restart services:
+    
+    ```bash
+    cd deploy
+    sudo docker-compose -f docker-compose-linux.yml down
+    sudo docker-compose -f docker-compose-linux.yml pull
+    sudo docker-compose -f docker-compose-linux.yml up -d
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Permission Issues
+
+If you encounter permission errors with Docker:
+
+```bash
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Log out and log back in for changes to take effect
+```
+
+### AppImage Won't Launch
+
+<Steps>
+  <Step title="Check Permissions">
+    Ensure the AppImage is executable:
+    
+    ```bash
+    chmod +x Duix.Avatar-x.x.x.AppImage
+    ```
+  </Step>
+  
+  <Step title="Run from Terminal">
+    Try launching from the terminal to see error messages:
+    
+    ```bash
+    ./Duix.Avatar-x.x.x.AppImage
+    ```
+  </Step>
+  
+  <Step title="Use No-Sandbox Mode">
+    If running as root:
+    
+    ```bash
+    ./Duix.Avatar-x.x.x.AppImage --no-sandbox
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Next Steps
+
+Now that Duix Avatar is installed, you're ready to create your first avatar!
+
+<Card title="Quick Start Guide" icon="rocket" href="/getting-started/quickstart">
+  Learn how to create your first avatar and generate videos
+</Card>

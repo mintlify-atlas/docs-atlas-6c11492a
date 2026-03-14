@@ -1,0 +1,141 @@
+---
+title: 'Authentication'
+description: 'Understanding local API access and security for Duix Avatar'
+---
+
+## No Authentication Required
+
+Duix Avatar APIs run locally on your machine and **do not require authentication**. This design ensures:
+
+- **Privacy** - No data leaves your computer
+- **Offline Operation** - Works without internet connection
+- **Simplicity** - No API keys or tokens to manage
+
+## Network Access
+
+### Default Configuration
+
+By default, the APIs are only accessible from localhost:
+
+```javascript
+// Production configuration (config.js:7-10)
+const serviceUrl = {
+  face2face: 'http://127.0.0.1:8383/easy',
+  tts: 'http://127.0.0.1:18180'
+}
+```
+
+### Port Configuration
+
+<ParamField path="TTS Port" type="number" default="18180">
+  Port for the Text-to-Speech API service
+  
+  **Endpoints:**
+  - `POST /v1/preprocess_and_tran` - Model training
+  - `POST /v1/invoke` - Audio synthesis
+</ParamField>
+
+<ParamField path="Face2Face Port" type="number" default="8383">
+  Port for the video synthesis API service
+  
+  **Endpoints:**
+  - `POST /easy/submit` - Submit video generation task
+  - `GET /easy/query` - Query task status
+</ParamField>
+
+## Testing API Availability
+
+### Check TTS Service
+
+Test if the Text-to-Speech service is running:
+
+```bash
+curl -X POST http://127.0.0.1:18180/v1/invoke \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+### Check Face2Face Service
+
+Test if the video synthesis service is running:
+
+```bash
+curl http://127.0.0.1:8383/easy/query?code=test
+```
+
+## Security Considerations
+
+### Localhost Only
+
+The services are bound to `127.0.0.1`, which means:
+
+<Check>Only accessible from the local machine</Check>
+<Check>Not exposed to network or internet</Check>
+<Check>Safe from external attacks</Check>
+
+### Firewall
+
+No inbound firewall rules needed since the services only accept local connections.
+
+### Data Storage
+
+All generated files are stored locally:
+
+- **Windows**: `D:\duix_avatar_data\`
+- **macOS/Linux**: `~/duix_avatar_data/`
+
+```javascript
+// Asset storage paths (config.js:12-25)
+const assetPath = {
+  model: 'duix_avatar_data/face2face/temp',      // Model videos
+  ttsProduct: 'duix_avatar_data/face2face/temp', // Generated audio
+  ttsRoot: 'duix_avatar_data/voice/data',        // Voice data
+  ttsTrain: 'duix_avatar_data/voice/data/origin_audio' // Training audio
+}
+```
+
+## Development Mode
+
+<Warning>
+In development mode, the APIs may point to different hosts for testing purposes. Always ensure production builds use localhost.
+</Warning>
+
+```javascript
+// Development configuration (config.js:7-10)
+const isDev = process.env.NODE_ENV === 'development'
+
+const serviceUrl = {
+  face2face: isDev ? 'http://192.168.4.204:8383/easy' : 'http://127.0.0.1:8383/easy',
+  tts: isDev ? 'http://192.168.4.204:18180' : 'http://127.0.0.1:18180'
+}
+```
+
+## Request Format
+
+All API requests use standard HTTP methods:
+
+- **Content-Type**: `application/json` for JSON requests
+- **Response Format**: JSON for most endpoints, binary for audio files
+- **Timeout**: No timeout limit (long-running operations supported)
+
+## Error Handling
+
+APIs return standard HTTP status codes:
+
+- `200` - Success
+- `400` - Bad request (invalid parameters)
+- `500` - Internal server error
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Model Training" icon="brain" href="/api/model-training">
+    Train voice models
+  </Card>
+  <Card title="Audio Synthesis" icon="microphone" href="/api/audio-synthesis">
+    Generate speech audio
+  </Card>
+  <Card title="Video Synthesis" icon="video" href="/api/video-synthesis">
+    Create avatar videos
+  </Card>
+</CardGroup>

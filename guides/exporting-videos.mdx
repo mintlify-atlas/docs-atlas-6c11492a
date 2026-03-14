@@ -1,0 +1,443 @@
+---
+title: Exporting Videos
+description: Learn how to export and share your synthesized videos
+---
+
+## Overview
+
+Once your video synthesis is complete, Duix Avatar provides a straightforward export function to save videos to any location on your system for sharing, publishing, or archival purposes.
+
+## Export Process
+
+The export function copies the synthesized video to a destination of your choice:
+
+```javascript
+// From src/main/service/video.js:247
+function exportVideo(videoId, outputPath) {
+  const video = selectVideoByID(videoId)
+  const filePath = path.join(assetPath.model, video.file_path)
+  fs.copyFileSync(filePath, outputPath)
+}
+```
+
+<Steps>
+  <Step title="Verify Video Status">
+    Ensure the video has completed synthesis successfully:
+    
+    ```javascript
+    const video = findVideo(videoId)
+    if(video.status !== 'success') {
+      console.error('Video not ready for export')
+      return
+    }
+    ```
+    
+    Only videos with `status: 'success'` can be exported.
+  </Step>
+
+  <Step title="Choose Output Location">
+    Specify the full path where you want to save the exported video:
+    
+    ```javascript
+    const outputPath = '/path/to/exported/my-video.mp4'
+    ```
+    
+    <Note>
+    The output path should include the filename and extension (e.g., `.mp4`).
+    </Note>
+  </Step>
+
+  <Step title="Export Video">
+    Call the export function via IPC:
+    
+    ```javascript
+    // From src/main/service/video.js:296
+    ipcMain.handle(MODEL_NAME + '/export', (event, ...args) => {
+      return exportVideo(...args)
+    })
+    
+    // Frontend usage
+    await ipcRenderer.invoke('video/export', videoId, outputPath)
+    ```
+  </Step>
+
+  <Step title="Verify Export">
+    Check that the file was copied successfully:
+    
+    ```javascript
+    if(fs.existsSync(outputPath)) {
+      console.log('Export successful!')
+    }
+    ```
+  </Step>
+</Steps>
+
+## File Information
+
+### Video Location
+
+Synthesized videos are stored in the model directory:
+
+```javascript
+const filePath = path.join(assetPath.model, video.file_path)
+```
+
+The `video.file_path` contains the relative path returned by the synthesis service.
+
+### Video Metadata
+
+Exported videos include the following information:
+
+```javascript
+const video = selectVideoByID(videoId)
+// {
+//   id: 1,
+//   name: 'My Video',
+//   status: 'success',
+//   file_path: 'result_uuid.mp4',
+//   duration: 45.2,              // seconds
+//   model_id: 1,
+//   voice_id: 1,
+//   text_content: 'Hello world',
+//   audio_path: 'uuid.wav',
+//   created_at: '2026-03-14 10:30:00'
+// }
+```
+
+<Tip>
+Use the `duration` field to verify video length before exporting.
+</Tip>
+
+## Output Formats
+
+### Video Format
+
+Synthesized videos are typically in MP4 format with H.264 encoding:
+
+- **Container**: MP4
+- **Video Codec**: H.264
+- **Audio Codec**: AAC
+- **Resolution**: Matches source avatar video
+- **Frame Rate**: Matches source avatar video
+
+<Note>
+The export function performs a direct file copy, preserving the original format and quality of the synthesized video.
+</Note>
+
+### File Naming
+
+Consider these naming conventions for exported videos:
+
+```javascript
+// Include project name
+const outputPath = `/exports/${projectName}_${video.name}.mp4`
+
+// Include timestamp
+const timestamp = dayjs().format('YYYYMMDD_HHmmss')
+const outputPath = `/exports/${video.name}_${timestamp}.mp4`
+
+// Include metadata
+const outputPath = `/exports/${modelName}_${voiceName}_${video.name}.mp4`
+```
+
+## Batch Export
+
+Export multiple videos programmatically:
+
+```javascript
+async function exportBatch(videoIds, outputDir) {
+  for(const videoId of videoIds) {
+    const video = selectVideoByID(videoId)
+    
+    // Skip if not ready
+    if(video.status !== 'success') continue
+    
+    // Generate output path
+    const outputPath = path.join(
+      outputDir, 
+      `${video.name}_${video.id}.mp4`
+    )
+    
+    // Export video
+    await exportVideo(videoId, outputPath)
+    console.log(`Exported: ${video.name}`)
+  }
+}
+```
+
+<Tip>
+Batch exports are useful for:
+- Archiving completed projects
+- Preparing multiple videos for delivery
+- Creating backup copies
+</Tip>
+
+## Sharing Videos
+
+### Local Sharing
+
+Copy videos to shared network locations:
+
+```javascript
+const networkPath = '//server/shared/videos/export.mp4'
+exportVideo(videoId, networkPath)
+```
+
+### Cloud Upload
+
+Export to a temporary location, then upload:
+
+```javascript
+import { tmpdir } from 'os'
+import { uploadToCloud } from './cloud-service'
+
+// Export to temp directory
+const tempPath = path.join(tmpdir(), 'export.mp4')
+exportVideo(videoId, tempPath)
+
+// Upload to cloud service
+await uploadToCloud(tempPath)
+
+// Cleanup
+fs.unlinkSync(tempPath)
+```
+
+### Direct Distribution
+
+Export directly to content delivery locations:
+
+```javascript
+const distributionPath = '/var/www/html/videos/latest.mp4'
+exportVideo(videoId, distributionPath)
+```
+
+<Warning>
+Ensure you have write permissions for the output directory before exporting.
+</Warning>
+
+## Storage Considerations
+
+### Disk Space
+
+Monitor available space before exporting:
+
+```javascript
+import { statfs } from 'fs'
+
+function checkDiskSpace(directory) {
+  const stats = statfs(directory)
+  const freeSpace = stats.bavail * stats.bsize
+  return freeSpace
+}
+
+const videoSize = fs.statSync(filePath).size
+const availableSpace = checkDiskSpace(outputDir)
+
+if(videoSize > availableSpace) {
+  console.error('Insufficient disk space')
+}
+```
+
+### Original Files
+
+The export function creates a copy, leaving the original intact:
+
+```javascript
+// Original remains in assetPath.model
+const originalPath = path.join(assetPath.model, video.file_path)
+
+// Copy created at output location
+const exportedPath = outputPath
+
+// Both files exist after export
+fs.existsSync(originalPath)  // true
+fs.existsSync(exportedPath)  // true
+```
+
+<Note>
+Original synthesized videos remain in the asset directory for re-export or future use.
+</Note>
+
+## Error Handling
+
+Handle common export errors:
+
+```javascript
+function safeExport(videoId, outputPath) {
+  try {
+    // Check video exists and is ready
+    const video = selectVideoByID(videoId)
+    if(!video) {
+      throw new Error('Video not found')
+    }
+    if(video.status !== 'success') {
+      throw new Error('Video not ready for export')
+    }
+    
+    // Check source file exists
+    const filePath = path.join(assetPath.model, video.file_path)
+    if(!fs.existsSync(filePath)) {
+      throw new Error('Source file not found')
+    }
+    
+    // Check output directory exists
+    const outputDir = path.dirname(outputPath)
+    if(!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true })
+    }
+    
+    // Perform export
+    exportVideo(videoId, outputPath)
+    
+    return { success: true, path: outputPath }
+  } catch(error) {
+    console.error('Export failed:', error.message)
+    return { success: false, error: error.message }
+  }
+}
+```
+
+### Common Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| File not found | Video not synthesized | Wait for synthesis to complete |
+| Permission denied | No write access | Check directory permissions |
+| Disk full | Insufficient space | Free up disk space |
+| Path invalid | Wrong directory separator | Use `path.join()` for cross-platform paths |
+
+## Best Practices
+
+### Export Workflow
+
+<Steps>
+  <Step title="Verify Status">
+    Always check video status before exporting
+  </Step>
+  
+  <Step title="Validate Path">
+    Ensure output path is valid and writable
+  </Step>
+  
+  <Step title="Create Directories">
+    Use `fs.mkdirSync()` with `recursive: true` for nested paths
+  </Step>
+  
+  <Step title="Export">
+    Call the export function
+  </Step>
+  
+  <Step title="Verify">
+    Confirm the exported file exists and has correct size
+  </Step>
+</Steps>
+
+### Organization
+
+<Tip>
+**Organize exported videos:**
+- Create project-specific export directories
+- Include metadata in filenames (date, version, etc.)
+- Maintain a log of exported videos
+- Implement version control for exports
+</Tip>
+
+### Quality Assurance
+
+Verify exported videos:
+
+```javascript
+function verifyExport(videoId, outputPath) {
+  const originalPath = path.join(
+    assetPath.model, 
+    selectVideoByID(videoId).file_path
+  )
+  
+  const originalSize = fs.statSync(originalPath).size
+  const exportedSize = fs.statSync(outputPath).size
+  
+  if(originalSize === exportedSize) {
+    console.log('Export verified successfully')
+    return true
+  } else {
+    console.error('Export size mismatch')
+    return false
+  }
+}
+```
+
+### Performance
+
+1. **Batch Operations**: Export multiple videos during off-peak hours
+2. **Compression**: Consider re-encoding for smaller file sizes if needed
+3. **Parallel Exports**: For large batches, use parallel processing
+4. **Network Transfers**: Use local exports before uploading to remote locations
+
+## Advanced Usage
+
+### Export with Metadata
+
+Create a metadata file alongside the export:
+
+```javascript
+function exportWithMetadata(videoId, outputPath) {
+  const video = selectVideoByID(videoId)
+  
+  // Export video
+  exportVideo(videoId, outputPath)
+  
+  // Create metadata JSON
+  const metadataPath = outputPath.replace('.mp4', '.json')
+  const metadata = {
+    id: video.id,
+    name: video.name,
+    duration: video.duration,
+    created_at: video.created_at,
+    model_id: video.model_id,
+    voice_id: video.voice_id,
+    text_content: video.text_content
+  }
+  
+  fs.writeFileSync(
+    metadataPath, 
+    JSON.stringify(metadata, null, 2)
+  )
+}
+```
+
+### Export to Multiple Formats
+
+Re-encode during export using FFmpeg:
+
+```javascript
+import { exec } from 'child_process'
+import { promisify } from 'util'
+const execPromise = promisify(exec)
+
+async function exportMultipleFormats(videoId, outputDir) {
+  const video = selectVideoByID(videoId)
+  const sourcePath = path.join(assetPath.model, video.file_path)
+  
+  // Export original
+  const mp4Path = path.join(outputDir, `${video.name}.mp4`)
+  exportVideo(videoId, mp4Path)
+  
+  // Convert to WebM
+  const webmPath = path.join(outputDir, `${video.name}.webm`)
+  await execPromise(
+    `ffmpeg -i "${mp4Path}" -c:v libvpx-vp9 -c:a libopus "${webmPath}"`
+  )
+  
+  // Create GIF preview
+  const gifPath = path.join(outputDir, `${video.name}.gif`)
+  await execPromise(
+    `ffmpeg -i "${mp4Path}" -vf "fps=10,scale=320:-1" "${gifPath}"`
+  )
+}
+```
+
+## Next Steps
+
+- Explore [Managing Models](/guides/managing-models) to organize your content library
+- Learn about [Video Synthesis](/guides/video-synthesis) to create more videos
+- Review [Voice Cloning](/guides/voice-cloning) for optimizing audio quality

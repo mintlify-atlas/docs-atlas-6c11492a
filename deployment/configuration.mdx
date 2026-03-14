@@ -1,0 +1,512 @@
+---
+title: 'Configuration'
+description: 'Configure Duix Avatar services and customize deployment settings'
+---
+
+## Overview
+
+Duix Avatar's configuration is managed through Docker Compose environment variables, volume mounts, and service parameters. This guide covers all configurable options for customizing your deployment.
+
+## Data Directory Structure
+
+All persistent data is stored in a dedicated directory structure:
+
+### Windows
+
+```
+D:/duix_avatar_data/
+├── voice/
+│   └── data/
+│       ├── models/          # TTS model files
+│       ├── audio/           # Training audio samples
+│       └── checkpoints/     # Training checkpoints
+└── face2face/
+    ├── models/              # Video generation models
+    ├── videos/              # Source videos for cloning
+    ├── outputs/             # Generated videos
+    └── cache/               # Temporary processing files
+```
+
+### Linux
+
+```
+~/duix_avatar_data/
+├── voice/
+│   └── data/
+│       ├── models/          # TTS model files
+│       ├── audio/           # Training audio samples
+│       └── checkpoints/     # Training checkpoints
+└── face2face/
+    ├── models/              # Video generation models
+    ├── videos/              # Source videos for cloning
+    ├── outputs/             # Generated videos
+    └── cache/               # Temporary processing files
+```
+
+<Warning>
+The base directory must exist before starting Docker services. Create it manually if it doesn't exist:
+
+**Windows**: `mkdir D:\duix_avatar_data\voice\data D:\duix_avatar_data\face2face`
+
+**Linux**: `mkdir -p ~/duix_avatar_data/voice/data ~/duix_avatar_data/face2face`
+</Warning>
+
+## Environment Variables
+
+### TTS Service (duix-avatar-tts)
+
+#### NVIDIA_VISIBLE_DEVICES
+
+Specifies which GPU(s) the TTS service can use.
+
+```yaml
+environment:
+  - NVIDIA_VISIBLE_DEVICES=0  # Use GPU 0 only
+```
+
+**Options**:
+- `0`, `1`, `2`, etc. - Specific GPU index
+- `0,1` - Multiple GPUs
+- `all` - All available GPUs
+
+#### NVIDIA_DRIVER_CAPABILITIES
+
+Defines NVIDIA driver capabilities enabled for the container.
+
+```yaml
+environment:
+  - NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video,display
+```
+
+**Capabilities**:
+- `compute` - CUDA and OpenCL (required)
+- `graphics` - OpenGL and Vulkan
+- `utility` - nvidia-smi and other tools
+- `video` - Video encoding/decoding
+- `display` - Display capabilities
+
+<Note>
+All capabilities are enabled by default for the TTS service. Only remove capabilities if you need to restrict access.
+</Note>
+
+### ASR Service (duix-avatar-asr)
+
+The ASR service uses GPU resource allocation via Docker Compose's `deploy` section rather than environment variables:
+
+```yaml
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all  # Use all GPUs
+          capabilities: [gpu]
+```
+
+**Configuration Options**:
+- `count: all` - Use all available GPUs
+- `count: 1` - Use one GPU
+- `count: 2` - Use two GPUs
+
+### Video Generation Service (duix-avatar-gen-video)
+
+#### PYTORCH_CUDA_ALLOC_CONF
+
+Configures PyTorch's CUDA memory allocator to prevent fragmentation.
+
+```yaml
+environment:
+  - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+```
+
+**Parameter**: `max_split_size_mb`
+- Default: `512` (512MB)
+- Range: `128` - `1024`
+- Higher values reduce fragmentation but may increase memory usage
+- Lower values save memory but may cause more fragmentation
+
+<Tip>
+If you experience CUDA out-of-memory errors, try reducing this value to `256` or `128`.
+</Tip>
+
+## Port Configuration
+
+All services expose HTTP APIs through mapped ports:
+
+### Default Port Mappings
+
+```yaml
+services:
+  duix-avatar-tts:
+    ports:
+      - '18180:8080'  # Host:Container
+  
+  duix-avatar-asr:
+    ports:
+      - '10095:10095'
+  
+  duix-avatar-gen-video:
+    ports:
+      - '8383:8383'
+```
+
+### Changing Port Mappings
+
+To change the external port (e.g., to avoid conflicts):
+
+```yaml
+services:
+  duix-avatar-tts:
+    ports:
+      - '28180:8080'  # Changed from 18180 to 28180
+```
+
+<Warning>
+If you change the external ports, you must update the client configuration to use the new ports.
+</Warning>
+
+### Port Reference Table
+
+| Service | Default External Port | Internal Port | Protocol | Purpose |
+|---------|----------------------|---------------|----------|----------|
+| TTS | 18180 | 8080 | HTTP | Text-to-speech API |
+| ASR | 10095 | 10095 | HTTP | Speech recognition |
+| Video Gen | 8383 | 8383 | HTTP | Video synthesis |
+
+## Volume Mounts
+
+Volume mounts connect host directories to container paths for data persistence.
+
+### TTS Service Volumes
+
+```yaml
+volumes:
+  - d:/duix_avatar_data/voice/data:/code/data  # Windows
+  # - ~/duix_avatar_data/voice/data:/code/data  # Linux
+```
+
+**Purpose**: Stores voice models, training data, and audio files
+
+**Host Path** (Windows): `D:/duix_avatar_data/voice/data`
+**Host Path** (Linux): `~/duix_avatar_data/voice/data`
+**Container Path**: `/code/data`
+
+### Video Service Volumes
+
+```yaml
+volumes:
+  - d:/duix_avatar_data/face2face:/code/data  # Windows
+  # - ~/duix_avatar_data/face2face:/code/data  # Linux
+```
+
+**Purpose**: Stores video models, source videos, and generated outputs
+
+**Host Path** (Windows): `D:/duix_avatar_data/face2face`
+**Host Path** (Linux): `~/duix_avatar_data/face2face`
+**Container Path**: `/code/data`
+
+### Changing Data Directories
+
+To use a different location:
+
+**Windows**:
+```yaml
+volumes:
+  - e:/my_custom_path/voice:/code/data  # Changed to E: drive
+```
+
+**Linux**:
+```yaml
+volumes:
+  - /mnt/data/duix/voice:/code/data  # Changed to /mnt/data
+```
+
+<Tip>
+Use absolute paths for volume mounts to avoid Docker Compose resolution issues.
+</Tip>
+
+## Service Configuration
+
+### Restart Policies
+
+All services use `restart: always` by default:
+
+```yaml
+restart: always
+```
+
+**Options**:
+- `no` - Never restart
+- `always` - Always restart (even after Docker daemon restart)
+- `on-failure` - Restart only on failure
+- `unless-stopped` - Always restart unless manually stopped
+
+### Container Names
+
+Standardized container names for easy management:
+
+```yaml
+services:
+  duix-avatar-tts:
+    container_name: duix-avatar-tts
+  
+  duix-avatar-asr:
+    container_name: duix-avatar-asr
+  
+  duix-avatar-gen-video:
+    container_name: duix-avatar-gen-video
+```
+
+### Privileged Mode
+
+Some services require privileged mode for hardware access:
+
+```yaml
+privileged: true
+```
+
+**Services using privileged mode**:
+- ASR service (requires full hardware access)
+- Video generation service (requires GPU access)
+
+<Warning>
+Privileged mode grants containers extended permissions. Only use it for services that require it.
+</Warning>
+
+### Shared Memory
+
+The video generation service requires 8GB of shared memory:
+
+```yaml
+shm_size: '8g'
+```
+
+**Adjusting shared memory**:
+```yaml
+shm_size: '16g'  # For larger models or batch processing
+shm_size: '4g'   # For systems with limited RAM
+```
+
+<Info>
+Shared memory is allocated from system RAM. Ensure you have sufficient RAM (32GB+ recommended).
+</Info>
+
+## Network Configuration
+
+Services communicate through a dedicated bridge network:
+
+```yaml
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-tts:
+    networks:
+      - ai_network
+```
+
+### Custom Network Settings
+
+To customize the network (e.g., for specific subnet requirements):
+
+```yaml
+networks:
+  ai_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+```
+
+## Resource Limits
+
+While not set by default, you can add resource limits:
+
+### CPU Limits
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '4'       # Maximum 4 CPU cores
+    reservations:
+      cpus: '2'       # Reserve 2 CPU cores
+```
+
+### Memory Limits
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 16G     # Maximum 16GB RAM
+    reservations:
+      memory: 8G      # Reserve 8GB RAM
+```
+
+<Warning>
+Setting memory limits too low may cause services to crash. Monitor usage before setting limits.
+</Warning>
+
+## Complete Configuration Examples
+
+### Production Configuration (Windows)
+
+```yaml
+networks:
+  ai_network:
+    driver: bridge
+
+services:
+  duix-avatar-tts:
+    image: guiji2025/fish-speech-ziming
+    container_name: duix-avatar-tts
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video,display
+    ports:
+      - '18180:8080'
+    volumes:
+      - d:/duix_avatar_data/voice/data:/code/data
+    command: /bin/bash -c "/opt/conda/envs/python310/bin/python3 tools/api_server.py --listen 0.0.0.0:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    networks:
+      - ai_network
+
+  duix-avatar-asr:
+    image: guiji2025/fun-asr
+    container_name: duix-avatar-asr
+    restart: unless-stopped
+    runtime: nvidia
+    privileged: true
+    working_dir: /workspace/FunASR/runtime
+    ports:
+      - '10095:10095'
+    command: sh /run.sh
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - ai_network
+
+  duix-avatar-gen-video:
+    image: guiji2025/duix.avatar
+    container_name: duix-avatar-gen-video
+    restart: unless-stopped
+    runtime: nvidia
+    privileged: true
+    volumes:
+      - d:/duix_avatar_data/face2face:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
+          devices:
+            - capabilities: [gpu]
+    shm_size: '8g'
+    ports:
+      - '8383:8383'
+    command: python /code/app_local.py
+    networks:
+      - ai_network
+```
+
+### Development Configuration (Custom Ports)
+
+```yaml
+services:
+  duix-avatar-tts:
+    ports:
+      - '28180:8080'  # Custom port
+    volumes:
+      - ./dev_data/voice:/code/data  # Relative path for dev
+  
+  duix-avatar-gen-video:
+    ports:
+      - '28383:8383'  # Custom port
+    volumes:
+      - ./dev_data/video:/code/data
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256  # Lower for dev
+```
+
+## Configuration Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use environment-specific compose files">
+    Create separate files for different environments:
+    - `docker-compose.yml` - Base configuration
+    - `docker-compose.prod.yml` - Production overrides
+    - `docker-compose.dev.yml` - Development overrides
+    
+    Run with: `docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+  </Accordion>
+
+  <Accordion title="Keep sensitive data in .env files">
+    Store configuration in a `.env` file:
+    ```bash
+    # .env
+    DATA_DIR=d:/duix_avatar_data
+    TTS_PORT=18180
+    GPU_DEVICE=0
+    ```
+    
+    Reference in docker-compose.yml:
+    ```yaml
+    volumes:
+      - ${DATA_DIR}/voice/data:/code/data
+    ports:
+      - '${TTS_PORT}:8080'
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor resource usage">
+    Use `docker stats` to monitor containers:
+    ```bash
+    docker stats duix-avatar-tts duix-avatar-asr duix-avatar-gen-video
+    ```
+    
+    Adjust resource limits based on observed usage.
+  </Accordion>
+
+  <Accordion title="Backup configuration and data">
+    Regular backups of:
+    - Docker Compose files
+    - Data directories (`duix_avatar_data/`)
+    - Environment configuration files
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Return to Docker deployment guide
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/deployment/troubleshooting">
+    Resolve configuration issues
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/introduction">
+    Learn about service APIs
+  </Card>
+</CardGroup>

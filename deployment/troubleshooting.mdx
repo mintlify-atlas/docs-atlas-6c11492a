@@ -1,0 +1,585 @@
+---
+title: 'Troubleshooting'
+description: 'Common issues and solutions for Duix Avatar deployment'
+---
+
+## Self-Check Before Troubleshooting
+
+Before diving into specific issues, perform these essential checks:
+
+<Steps>
+  <Step title="Verify All Services Are Running">
+    Check Docker container status:
+    
+    ```bash
+    docker ps
+    ```
+    
+    You should see all three services (or one for lite mode) with status "Up":
+    - `duix-avatar-tts`
+    - `duix-avatar-asr`
+    - `duix-avatar-gen-video`
+    
+    If any service is not running, check its logs:
+    ```bash
+    docker logs duix-avatar-tts
+    docker logs duix-avatar-asr
+    docker logs duix-avatar-gen-video
+    ```
+  </Step>
+
+  <Step title="Confirm NVIDIA GPU and Drivers">
+    Verify NVIDIA GPU is detected:
+    
+    ```bash
+    nvidia-smi
+    ```
+    
+    Expected output should show:
+    - Driver version
+    - CUDA version
+    - GPU name and utilization
+    
+    **All computing power for Duix Avatar is local. Services will not start without an NVIDIA GPU and proper drivers.**
+  </Step>
+
+  <Step title="Update to Latest Versions">
+    The project is actively developed with frequent updates. Your issue may already be resolved.
+    
+    **Update Server:**
+    ```bash
+    cd /path/to/Duix.Avatar/deploy
+    docker-compose pull
+    docker-compose up -d
+    ```
+    
+    **Update Client:**
+    Download the latest release from [GitHub Releases](https://github.com/duixcom/Duix.Avatar/releases)
+  </Step>
+
+  <Step title="Check GitHub Issues">
+    Search [GitHub Issues](https://github.com/duixcom/Duix.Avatar/issues) for your problem. Many issues are resolved daily.
+  </Step>
+</Steps>
+
+## Docker Issues
+
+### Services Won't Start
+
+<AccordionGroup>
+  <Accordion title="Error: 'runtime' is not supported">
+    **Problem**: Docker doesn't recognize the `nvidia` runtime.
+    
+    **Solution for Windows**:
+    1. Ensure Docker Desktop is using WSL 2 backend
+    2. Update Docker Desktop to the latest version
+    3. Restart Docker Desktop
+    
+    **Solution for Linux**:
+    ```bash
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
+    ```
+    
+    Verify NVIDIA runtime is available:
+    ```bash
+    docker info | grep -i runtime
+    ```
+  </Accordion>
+
+  <Accordion title="Error: 'could not select device driver'">
+    **Problem**: Docker can't access NVIDIA GPU.
+    
+    **Symptoms**:
+    ```
+    could not select device driver "" with capabilities: [[gpu]]
+    ```
+    
+    **Solution**:
+    1. Verify NVIDIA drivers are installed:
+       ```bash
+       nvidia-smi
+       ```
+    
+    2. Install/reinstall NVIDIA Container Toolkit (Linux):
+       ```bash
+       sudo apt-get update
+       sudo apt-get install -y nvidia-container-toolkit
+       sudo nvidia-ctk runtime configure --runtime=docker
+       sudo systemctl restart docker
+       ```
+    
+    3. For Windows, ensure WSL 2 has access to GPU:
+       ```bash
+       wsl --update
+       wsl --shutdown
+       # Restart Docker Desktop
+       ```
+  </Accordion>
+
+  <Accordion title="Error: 'port is already allocated'">
+    **Problem**: Another service is using the required port.
+    
+    **Symptoms**:
+    ```
+    Bind for 0.0.0.0:18180 failed: port is already allocated
+    ```
+    
+    **Solution**:
+    1. Find what's using the port:
+       ```bash
+       # Windows
+       netstat -ano | findstr :18180
+       
+       # Linux
+       sudo lsof -i :18180
+       ```
+    
+    2. Stop the conflicting service or change Duix Avatar's port:
+       ```yaml
+       ports:
+         - '28180:8080'  # Changed from 18180 to 28180
+       ```
+  </Accordion>
+
+  <Accordion title="Error: 'no such file or directory' for volume mount">
+    **Problem**: Data directory doesn't exist.
+    
+    **Solution**:
+    Create the required directories:
+    
+    **Windows**:
+    ```bash
+    mkdir D:\duix_avatar_data\voice\data
+    mkdir D:\duix_avatar_data\face2face
+    ```
+    
+    **Linux**:
+    ```bash
+    mkdir -p ~/duix_avatar_data/voice/data
+    mkdir -p ~/duix_avatar_data/face2face
+    ```
+  </Accordion>
+
+  <Accordion title="Services download is very slow">
+    **Problem**: Image downloads taking too long.
+    
+    **Expected**: ~30 minutes, ~70GB download
+    
+    **Solutions**:
+    1. Use a stable WiFi connection (not mobile data)
+    2. Configure Docker to use a mirror registry (China users)
+    3. Download during off-peak hours
+    4. Check available disk space (need 100GB+ free)
+  </Accordion>
+</AccordionGroup>
+
+## GPU Issues
+
+### NVIDIA Driver Problems
+
+<AccordionGroup>
+  <Accordion title="nvidia-smi: command not found">
+    **Problem**: NVIDIA drivers not installed or not in PATH.
+    
+    **Solution for Windows**:
+    1. Download drivers from [NVIDIA Driver Downloads](https://www.nvidia.com/drivers/lookup/)
+    2. Select your GPU model and OS
+    3. Install with "Custom" installation, choose "Clean Installation"
+    4. Restart computer
+    
+    **Solution for Linux**:
+    ```bash
+    # Add NVIDIA driver PPA
+    sudo add-apt-repository ppa:graphics-drivers/ppa
+    sudo apt update
+    
+    # Install recommended driver
+    sudo apt install nvidia-driver-560
+    sudo reboot
+    ```
+  </Accordion>
+
+  <Accordion title="NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver">
+    **Problem**: Driver installed but not loaded.
+    
+    **Solution for Windows**:
+    1. Restart your computer
+    2. Check Windows Update for driver updates
+    3. Reinstall NVIDIA drivers with "Clean Installation" option
+    
+    **Solution for Linux**:
+    ```bash
+    # Check if nvidia module is loaded
+    lsmod | grep nvidia
+    
+    # Load nvidia module
+    sudo modprobe nvidia
+    
+    # Check kernel logs for errors
+    dmesg | grep -i nvidia
+    
+    # If errors persist, reinstall driver
+    sudo apt purge nvidia-*
+    sudo apt install nvidia-driver-560
+    sudo reboot
+    ```
+  </Accordion>
+
+  <Accordion title="CUDA out of memory errors">
+    **Problem**: GPU doesn't have enough VRAM.
+    
+    **Solutions**:
+    1. Close other GPU-intensive applications
+    2. Reduce PyTorch memory allocation:
+       ```yaml
+       environment:
+         - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256  # Reduced from 512
+       ```
+    3. Use a GPU with more VRAM (16GB+ recommended)
+    4. Process smaller batches or lower resolution videos
+  </Accordion>
+
+  <Accordion title="GPU not being utilized">
+    **Problem**: Services running but GPU shows 0% usage.
+    
+    **Diagnosis**:
+    ```bash
+    # Monitor GPU in real-time
+    watch -n 1 nvidia-smi
+    
+    # Check service logs for GPU initialization
+    docker logs duix-avatar-gen-video | grep -i cuda
+    ```
+    
+    **Solutions**:
+    1. Verify services are using NVIDIA runtime:
+       ```bash
+       docker inspect duix-avatar-tts | grep -i runtime
+       ```
+    2. Check GPU resource allocation in docker-compose.yml
+    3. Ensure no CPU-only mode is enabled
+  </Accordion>
+</AccordionGroup>
+
+### RTX 50 Series Specific Issues
+
+<Accordion title="RTX 5090 services won't start">
+  **Problem**: Standard images don't work with RTX 50 series.
+  
+  **Solution**: Use the RTX 5090-specific docker-compose file:
+  
+  ```bash
+  cd deploy
+  docker-compose -f docker-compose-5090.yml up -d
+  ```
+  
+  The 5090 images use:
+  - `guiji2025/fish-speech-5090` (TTS)
+  - `guiji2025/duix.avatar-5090` (Video)
+  - CUDA 12.8 with PyTorch preview builds
+  
+  <Note>
+  RTX 5090 configuration does not include ASR service.
+  </Note>
+</Accordion>
+
+## Service-Specific Issues
+
+### TTS Service Issues
+
+<AccordionGroup>
+  <Accordion title="TTS service fails to start">
+    **Check logs**:
+    ```bash
+    docker logs duix-avatar-tts
+    ```
+    
+    **Common issues**:
+    1. **Missing voice data directory**:
+       ```bash
+       mkdir -p d:/duix_avatar_data/voice/data  # Windows
+       mkdir -p ~/duix_avatar_data/voice/data   # Linux
+       ```
+    
+    2. **GPU not accessible**: Verify `nvidia-smi` works and NVIDIA runtime is configured
+    
+    3. **Port 18180 already in use**: Change port mapping or stop conflicting service
+  </Accordion>
+
+  <Accordion title="TTS API returns errors">
+    **Test the API**:
+    ```bash
+    curl http://127.0.0.1:18180/v1/invoke
+    ```
+    
+    **If connection refused**:
+    1. Check service is running: `docker ps | grep tts`
+    2. Check port mapping: `docker port duix-avatar-tts`
+    3. Check firewall isn't blocking port 18180
+    
+    **If 500 errors**:
+    1. Check service logs: `docker logs duix-avatar-tts -f`
+    2. Verify GPU is accessible inside container:
+       ```bash
+       docker exec duix-avatar-tts nvidia-smi
+       ```
+  </Accordion>
+</AccordionGroup>
+
+### ASR Service Issues
+
+<AccordionGroup>
+  <Accordion title="ASR service won't start">
+    **Check logs**:
+    ```bash
+    docker logs duix-avatar-asr
+    ```
+    
+    **Common issues**:
+    1. **GPU not available**: ASR requires GPU access
+       ```yaml
+       deploy:
+         resources:
+           reservations:
+             devices:
+               - driver: nvidia
+                 count: all
+                 capabilities: [gpu]
+       ```
+    
+    2. **Privileged mode required**: Ensure `privileged: true` is set
+    
+    3. **Working directory issue**: Verify working_dir is correct:
+       ```yaml
+       working_dir: /workspace/FunASR/runtime
+       ```
+  </Accordion>
+
+  <Accordion title="ASR not available in RTX 5090 setup">
+    **This is expected behavior**. The RTX 5090 docker-compose configuration (`docker-compose-5090.yml`) does not include the ASR service.
+    
+    **Workaround**: If you need ASR with RTX 5090:
+    1. Manually add the ASR service from `docker-compose.yml` to your configuration
+    2. Test compatibility with your GPU
+  </Accordion>
+</AccordionGroup>
+
+### Video Generation Service Issues
+
+<AccordionGroup>
+  <Accordion title="Video service crashes with OOM">
+    **Problem**: Out of memory errors.
+    
+    **Solutions**:
+    1. Increase shared memory:
+       ```yaml
+       shm_size: '16g'  # Increased from 8g
+       ```
+    
+    2. Reduce CUDA memory split:
+       ```yaml
+       environment:
+         - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+       ```
+    
+    3. Ensure sufficient system RAM (32GB+ recommended)
+    
+    4. Close other applications to free memory
+  </Accordion>
+
+  <Accordion title="Video generation is very slow">
+    **Check GPU utilization**:
+    ```bash
+    nvidia-smi dmon -s u
+    ```
+    
+    **Optimization steps**:
+    1. Ensure GPU is being used (should show high utilization)
+    2. Check for thermal throttling: `nvidia-smi -q -d TEMPERATURE`
+    3. Verify GPU isn't being shared with other processes
+    4. Use RTX 4070 or better for optimal performance
+  </Accordion>
+
+  <Accordion title="Generated videos have poor quality">
+    **This is a configuration issue**, not a deployment issue.
+    
+    **Check**:
+    1. Source video quality - use high-quality input videos
+    2. Audio quality - clear audio produces better results
+    3. Model training - ensure model is properly trained
+    4. API parameters - verify synthesis parameters are correct
+  </Accordion>
+</AccordionGroup>
+
+## Client Issues
+
+### Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Client can't connect to services">
+    **Verify services are accessible**:
+    ```bash
+    curl http://127.0.0.1:18180  # TTS
+    curl http://127.0.0.1:10095  # ASR
+    curl http://127.0.0.1:8383   # Video
+    ```
+    
+    **If curl fails**:
+    1. Check services are running: `docker ps`
+    2. Verify port mappings: `docker port duix-avatar-tts`
+    3. Check firewall settings
+    4. Ensure client is configured with correct ports
+  </Accordion>
+
+  <Accordion title="Ubuntu: AppImage won't launch">
+    **Problem**: Double-clicking AppImage doesn't work.
+    
+    **Solution for root users**:
+    ```bash
+    ./Duix.Avatar-x.x.x.AppImage --no-sandbox
+    ```
+    
+    **Solution for regular users**:
+    1. Make executable: `chmod +x Duix.Avatar-x.x.x.AppImage`
+    2. Run: `./Duix.Avatar-x.x.x.AppImage`
+  </Accordion>
+</AccordionGroup>
+
+## Logging and Diagnostics
+
+### Collecting Service Logs
+
+<Tabs>
+  <Tab title="All Services">
+    ```bash
+    # View all service logs
+    docker-compose logs
+    
+    # Follow logs in real-time
+    docker-compose logs -f
+    
+    # Save logs to file
+    docker-compose logs > duix-logs.txt
+    ```
+  </Tab>
+  
+  <Tab title="Specific Service">
+    ```bash
+    # View logs
+    docker logs duix-avatar-tts
+    docker logs duix-avatar-asr
+    docker logs duix-avatar-gen-video
+    
+    # Follow logs
+    docker logs -f duix-avatar-tts
+    
+    # Last 100 lines
+    docker logs --tail 100 duix-avatar-tts
+    
+    # Save to file
+    docker logs duix-avatar-tts > tts-logs.txt
+    ```
+  </Tab>
+  
+  <Tab title="Client Logs">
+    **Windows/Linux Client**:
+    
+    1. Click "Help" menu in the client
+    2. Select "Show Logs" or "Open Log Directory"
+    3. Copy relevant log files
+    
+    **Alternative**:
+    - Windows: `%APPDATA%/Duix.Avatar/logs/`
+    - Linux: `~/.config/Duix.Avatar/logs/`
+  </Tab>
+</Tabs>
+
+### System Information for Bug Reports
+
+When reporting issues, include:
+
+```bash
+# System info
+uname -a
+
+# Docker version
+docker --version
+docker-compose --version
+
+# NVIDIA info
+nvidia-smi
+
+# Container status
+docker ps -a
+
+# Service logs (copy from docker logs command)
+docker logs duix-avatar-tts 2>&1 | tail -50
+docker logs duix-avatar-asr 2>&1 | tail -50
+docker logs duix-avatar-gen-video 2>&1 | tail -50
+```
+
+## Reporting Issues
+
+When creating a GitHub issue, include:
+
+<Steps>
+  <Step title="Problem Description">
+    - What you were trying to do
+    - What actually happened
+    - Include screenshots if applicable
+  </Step>
+  
+  <Step title="Reproduction Steps">
+    Detailed steps to reproduce the issue:
+    1. Step one
+    2. Step two
+    3. Step three
+  </Step>
+  
+  <Step title="Environment Information">
+    - OS: Windows 10/11 or Ubuntu 22.04
+    - GPU: RTX 4070, RTX 5090, etc.
+    - Docker version
+    - Client version
+    - Deployment mode: standard, lite, linux, 5090
+  </Step>
+  
+  <Step title="Logs">
+    - Relevant service logs (see "Collecting Service Logs" above)
+    - Client logs
+    - Error messages
+  </Step>
+</Steps>
+
+## Common Error Messages
+
+| Error Message | Cause | Solution |
+|--------------|-------|----------|
+| `runtime "nvidia" not found` | NVIDIA Container Toolkit not installed | Install toolkit and configure Docker |
+| `port already allocated` | Port conflict | Change port mapping or stop conflicting service |
+| `no such file or directory` | Volume mount path doesn't exist | Create data directories |
+| `CUDA out of memory` | Insufficient GPU VRAM | Close other apps, reduce batch size, or upgrade GPU |
+| `failed to create endpoint` | Network configuration issue | Restart Docker, check network settings |
+| `permission denied` | Volume mount permission issue | Check directory permissions, use absolute paths |
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/duixcom/Duix.Avatar/issues">
+    Search existing issues or create a new one
+  </Card>
+  <Card title="Email Support" icon="envelope" href="mailto:james@duix.com">
+    Contact the team directly
+  </Card>
+  <Card title="Documentation" icon="book" href="/introduction">
+    Review full documentation
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/introduction">
+    API documentation and examples
+  </Card>
+</CardGroup>
+
+<Note>
+Before asking questions, always complete the self-check steps at the top of this page. This resolves most common issues.
+</Note>
